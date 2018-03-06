@@ -29,22 +29,31 @@ int main(int argc, char **argv) {
 		exit(ERR_BADPARAMS);		
 	}
 
+	uint8_t mac[6];
+	int result = getMacAddress(interface, mac);
+	cout << "mac:";
+	 int i;
+    for (i = 0; i < 6; ++i)
+      printf(" %02x", (unsigned char) mac[i]);
+    puts("\n");
+
     return 0;
 }
 
-int getMacAddress(string interface, u_int8_t *mac) {
-	struct ifreq s;
-    int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-    int result;
+int getMacAddress(string interface, uint8_t *mac) {
+  struct ifreq s;
+  int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
 
-    strcpy(s.ifr_name, dev_name);
-    result = ioctl(fd, SIOCGIFHWADDR, &s);
-    close(fd);
-    if (result != 0)
-        return -1;
-
-    memcpy((void *)mac, s.ifr_addr.sa_data, 6);
+  strcpy(s.ifr_name, "eth0");
+  if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
+  	memcpy((void *)mac, s.ifr_addr.sa_data, 6);
+    int i;
+    for (i = 0; i < 6; ++i)
+      printf(" %02x", (unsigned char) s.ifr_addr.sa_data[i]);
+    puts("\n");
     return 0;
+  }
+  return 1;
 }
 
 void sendDiscover() {
