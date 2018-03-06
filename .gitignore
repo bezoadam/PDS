@@ -90,3 +90,7 @@ xbezak01-2/server.h
 xbezak01-2/server1
 xbezak01-2/skuska.txt
 xbezak01-2/test.sh
+dhcp-client-master/BSDmakefile
+dhcp-client-master/dhcp-client.c
+dhcp-client-master/Makefile
+dhcp-client-master/README.md
