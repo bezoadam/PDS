@@ -37,6 +37,8 @@ int main(int argc, char **argv) {
       printf(" %02x", (unsigned char) mac[i]);
     puts("\n");
 
+    sendDiscover();
+
     return 0;
 }
 
@@ -71,7 +73,7 @@ void sendDiscover() {
 
 	memset(&addr,0,sizeof(addr));
 	addr.sin_family=AF_INET;
-	addr.sin_addr.s_addr=inet_addr("127.255.255.255");  // set the broadcast address
+	addr.sin_addr.s_addr=inet_addr("255.255.255.255");  // set the broadcast address
 	addr.sin_port=htons(atoi("67"));       // set the broadcast port
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)

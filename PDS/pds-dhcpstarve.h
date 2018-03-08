@@ -51,7 +51,7 @@ typedef struct dhcp {
     char        bp_sname[DHCP_SNAME_LEN];
     char        bp_file[DHCP_FILE_LEN];
     uint32_t    magic_cookie;
-    u_int8_t    bp_options[0];
+    u_int8_t    bp_options[300];
 } dhcp_t;
 
 int getMacAddress(string interface, uint8_t *mac);
