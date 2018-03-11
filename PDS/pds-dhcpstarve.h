@@ -1,6 +1,6 @@
 /**
- *	Program: PDS
- *	Author: Adam Bezak xbezak01
+ *  Program: PDS
+ *  Author: Adam Bezak xbezak01
  */
 #include <iostream>
 #include <ctype.h>
@@ -41,13 +41,13 @@ using namespace std;
 #define DHCP_FILE_LEN   128
 
 enum {
-	NO_ERR = 0,		//0
-	ERR_BADPARAMS,	//1
+    NO_ERR = 0,     //0
+    ERR_BADPARAMS,  //1
 };
 
 const char *errors[] = {
-	"Ziadna chyba.",
-	"Chyba vo vstupnych parametroch"
+    "Ziadna chyba.",
+    "Chyba vo vstupnych parametroch"
 };
 
 
@@ -74,12 +74,17 @@ typedef struct dhcp {
 
 // int getMacAddress(string interface, uint8_t *mac);
 
-void sendDiscover(dhcp_t *dhcpDiscover);
+void getMacAddress(uint8_t *mac);
+void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[]);
+dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket);
+void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[]);
+void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket);
+void configureSocket(int *sock, string interface);
 void fill_dhcp_option(u_int8_t *packet, u_int8_t code, u_int8_t *data, u_int8_t len);
 
 /*
-*	Funkcia na vypis error statusov
-*	@param err cislo erroru
-*	@return void
+*   Funkcia na vypis error statusov
+*   @param err cislo erroru
+*   @return void
 */
 void print_error(int err);
