@@ -14,6 +14,11 @@
 #include <netinet/in.h>   
 #include <netdb.h>        
 #include <err.h>
+#include <signal.h>
+#include <inttypes.h>
+#include <iostream>
+#include <iomanip>
+#include <cstdint>
 
 #include <sys/ioctl.h>
 using namespace std;
@@ -74,10 +79,11 @@ typedef struct dhcp {
 
 // int getMacAddress(string interface, uint8_t *mac);
 
-void getMacAddress(uint8_t *mac);
-void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[]);
+void sigCatch(int sig);
+void getMacAddress(uint8_t *mac, uint32_t *xid);
+void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid);
 dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket);
-void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[]);
+void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint32_t *xid, uint32_t *offeredIp);
 void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket);
 void configureSocket(int *sock, string interface);
 void fill_dhcp_option(u_int8_t *packet, u_int8_t code, u_int8_t *data, u_int8_t len);

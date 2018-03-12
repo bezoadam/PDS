@@ -5,6 +5,8 @@
 
 #include "pds-dhcpstarve.h"
 
+volatile sig_atomic_t flag = 0;
+
 int main(int argc, char **argv) {
   
   	int ch;
@@ -29,28 +31,58 @@ int main(int argc, char **argv) {
 		exit(ERR_BADPARAMS);		
 	}
 	
+	// signal(SIGINT, sigCatch); 
+
 	uint8_t mac[6];
-	getMacAddress(mac);
+	mac[0] = 0x08;
+	mac[1] = 0x00;
+	mac[2] = 0x27;
+	mac[3] = 0x00;
+	mac[4] = 0x00;
+	mac[5] = 0x00;
+
+	uint32_t xid = htonl(0x01010000);
+
 
 	int socket;
 	configureSocket(&socket, interface);
-
     dhcp_t *dhcpDiscover = new dhcp;
-
-    makeDiscover(dhcpDiscover, mac);
-
     dhcp_t *dhcpOffer = new dhcp;
-    *dhcpOffer = sendDiscoverAndReceiveOffer(dhcpDiscover, &socket);
-    cout << "test2" << flush;
     dhcp_t *dhcpRequest = new dhcp;
-  
-    uint8_t dhcpServerId[5];
-    memcpy(&dhcpServerId, &dhcpOffer->bp_options[3], 6);
 
-    makeRequest(dhcpRequest, mac, dhcpServerId);
+	getMacAddress(mac, &xid);
+
+	cout << "mac:";
+	 int i;
+    for (i = 0; i < 6; ++i)
+      printf(" %02x", (unsigned char) mac[i]);
+    puts("\n");
+
+    makeDiscover(dhcpDiscover, mac, &xid);
+
+    *dhcpOffer = sendDiscoverAndReceiveOffer(dhcpDiscover, &socket);
+    if (flag) {
+		delete dhcpDiscover;
+		delete dhcpOffer;
+		delete dhcpRequest;
+		return 0;
+	}
+  
+    uint8_t dhcpServerId[4];
+    memcpy(&dhcpServerId, &dhcpOffer->bp_options[5], 4);
+
+    uint32_t offeredIp;
+    memcpy(&offeredIp, &dhcpOffer->yiaddr, sizeof(uint32_t));
+
+   	cout << "\n vonku";
+    std::cout << std::setfill('0') << std::setw(8) << std::hex << &dhcpOffer->xid << '\n';
+
+    printf("%s", inet_ntoa(*(struct in_addr *)&offeredIp));
+
+    makeRequest(dhcpRequest, mac, dhcpServerId, &xid, &offeredIp);
     sendRequestAndReceiveAck(dhcpRequest, &socket);
 
-    cout << "test" << flush;
+
     if ((close(socket)) == -1)      // close the socket
 	err(1,"close() failed");
 	printf("Closing socket ...\n");
@@ -111,12 +143,12 @@ void configureSocket(int *sock, string interface) {
 //   return 1;
 // }
 
-void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[]) {
+void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid) {
     dhcpDiscover->opcode = 1;
     dhcpDiscover->htype = 1;
     dhcpDiscover->hlen = 6;
     dhcpDiscover->hops = 0;
-    dhcpDiscover->xid = htonl(1000);
+    dhcpDiscover->xid = *xid;
     dhcpDiscover->secs = 0;
     dhcpDiscover->flags = htons(0x8000);
     dhcpDiscover->ciaddr = 0;
@@ -167,10 +199,17 @@ dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket) {
 	 // read data from the multicast socket and print them on stdout until "END." is received
 
 	while ((n= recvfrom(*socket, dhcpOffer, sizeof(dhcp), 0, (struct sockaddr *) &addr, &addrlen)) >= 0) {
-		if (dhcpOffer->bp_options[2] == (uint8_t)02) {
-			printf("DHCP OFFER received\n");
+		if (flag) {
+			cout << "dhcp som tu" << flush;
 			return *dhcpOffer;
 		}
+	}
+
+	if (dhcpOffer->bp_options[2] == (uint8_t)02) {
+		printf("DHCP OFFER received\n");
+		cout << "dhcp som tu" << flush;
+    	printf("%s", inet_ntoa(*(struct in_addr *)&dhcpOffer->yiaddr));
+		return *dhcpOffer;
 	}
 
 	// if ((close(*socket)) == -1)      // close the socket
@@ -178,29 +217,33 @@ dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket) {
 	// printf("Closing socket ...\n");
 }
 
-void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[]) {
+void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint32_t *xid, uint32_t *offeredIp) {
     dhcpRequest->opcode = 1;
     dhcpRequest->htype = 1;
     dhcpRequest->hlen = 6;
     dhcpRequest->hops = 0;
-    dhcpRequest->xid = htonl(1000);
+    dhcpRequest->xid = *xid;
     dhcpRequest->secs = 0;
     dhcpRequest->flags = htons(0x8000);
     dhcpRequest->ciaddr = 0;
-    dhcpRequest->yiaddr = 0;
+    dhcpRequest->yiaddr = *offeredIp;
     dhcpRequest->siaddr = 0;
     dhcpRequest->giaddr = 0;
     memcpy(&dhcpRequest->chaddr, &mac, sizeof(mac));
     dhcpRequest->magic_cookie = htonl(0x63825363);
-   	
+    cout << "\nmake request2\n";
+   	cout << "\nmake request\n";
+   	printf("%s\n", inet_ntoa(*(struct in_addr *)offeredIp));
    	uint8_t option = DHCP_OPTION_REQUEST;
    	fill_dhcp_option(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
+   	fill_dhcp_option(&dhcpRequest->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)offeredIp, sizeof(uint32_t));
 
-   	uint32_t req_ip = htonl(0xc0a8010a);
-   	fill_dhcp_option(&dhcpRequest->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)&req_ip, sizeof(req_ip));
-
-   	memcpy(&dhcpRequest->bp_options[9], &dhcpServerId, sizeof(dhcpServerId));
-
+   	dhcpRequest->bp_options[9] = 0x36;
+   	dhcpRequest->bp_options[10] = 0x4;
+   	memcpy(&dhcpRequest->bp_options[11], dhcpServerId, sizeof(uint32_t));
+	
+	option = 0;
+   	fill_dhcp_option(&dhcpRequest->bp_options[19], MESSAGE_TYPE_END, &option, 0);
 }
 
 void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket) {
@@ -225,26 +268,33 @@ void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket) {
 	 // read data from the multicast socket and print them on stdout until "END." is received
 
 	while ((n= recvfrom(*socket, dhcpAck, sizeof(dhcp), 0, (struct sockaddr *) &addr, &addrlen)) >= 0) {
-		if (dhcpAck->bp_options[2] == (uint8_t)05) {
-			printf("DHCP ACK received\n");
-			break;
+		if (flag) {
+			cout << "som tu" << flush;
+			return;
 		}
+	}
+	if (dhcpAck->bp_options[2] == (uint8_t)05) {
+		cout << "som tu" << flush;
+		printf("DHCP ACK received\n");
+		return;
 	}
 }
 
-void getMacAddress(uint8_t *mac) {
-	mac[0] = 0x00;
-	mac[1] = 0x1A;
-	mac[2] = 0x80;
-	mac[3] = 0x80;
-	mac[4] = 0x2C;
-	mac[5] = 0xC3;
+void getMacAddress(uint8_t *mac, uint32_t *xid) {
+	if (mac[5] < (uint8_t)0xFF) {
+		mac[5] = mac[5] + 1;
+	} else if (mac[4] < (uint8_t)0xFF) {
+		mac[4] = mac[4] + 1;
+	} else if (mac[3] < (uint8_t)0xFF) {
+		mac[3] = mac[3] + 1;
+	}
+
+	xid = xid + 1;
 	// int result = getMacAddress(interface, mac);
-	cout << "mac:";
-	 int i;
-    for (i = 0; i < 6; ++i)
-      printf(" %02x", (unsigned char) mac[i]);
-    puts("\n");
+}
+
+void sigCatch(int sig) {
+	flag = 1;
 }
 
 void print_error(int err) {
