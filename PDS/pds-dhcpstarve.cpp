@@ -31,7 +31,13 @@ int main(int argc, char **argv) {
 		exit(ERR_BADPARAMS);		
 	}
 	
-	// signal(SIGINT, sigCatch); 
+	struct sigaction sigIntHandler;
+
+	sigIntHandler.sa_handler = sigCatch;
+	sigemptyset(&sigIntHandler.sa_mask);
+	sigIntHandler.sa_flags = 0;
+
+	sigaction(SIGINT, &sigIntHandler, NULL);
 
 	uint8_t mac[6];
 	mac[0] = 0x08;
@@ -50,37 +56,40 @@ int main(int argc, char **argv) {
     dhcp_t *dhcpOffer = new dhcp;
     dhcp_t *dhcpRequest = new dhcp;
 
-	getMacAddress(mac, &xid);
+    while(1) {
+		getMacAddress(mac, &xid);
 
-	cout << "mac:";
-	 int i;
-    for (i = 0; i < 6; ++i)
-      printf(" %02x", (unsigned char) mac[i]);
-    puts("\n");
+		// std::cout << std::setfill('0') << std::setw(8) << std::hex << xid << '\n';
 
-    makeDiscover(dhcpDiscover, mac, &xid);
+		cout << "mac:";
+		 int i;
+	    for (i = 0; i < 6; ++i)
+	      printf(" %02x", (unsigned char) mac[i]);
+	    puts("\n");
 
-    *dhcpOffer = sendDiscoverAndReceiveOffer(dhcpDiscover, &socket);
-    if (flag) {
-		delete dhcpDiscover;
-		delete dhcpOffer;
-		delete dhcpRequest;
-		return 0;
-	}
-  
-    uint8_t dhcpServerId[4];
-    memcpy(&dhcpServerId, &dhcpOffer->bp_options[5], 4);
+	    makeDiscover(dhcpDiscover, mac, &xid);
 
-    uint32_t offeredIp;
-    memcpy(&offeredIp, &dhcpOffer->yiaddr, sizeof(uint32_t));
+	    *dhcpOffer = sendDiscoverAndReceiveOffer(dhcpDiscover, &socket);
+	    if (flag) {
+	    	cout << "\ndelete\n";
+			delete dhcpDiscover;
+			delete dhcpOffer;
+			delete dhcpRequest;
+			return 0;
+		}
+	  
+	    uint8_t dhcpServerId[4];
+	    memcpy(&dhcpServerId, &dhcpOffer->bp_options[5], 4);
 
-   	cout << "\n vonku";
-    std::cout << std::setfill('0') << std::setw(8) << std::hex << &dhcpOffer->xid << '\n';
+	    uint32_t offeredIp;
+	    memcpy(&offeredIp, &dhcpOffer->yiaddr, sizeof(uint32_t));
 
-    printf("%s", inet_ntoa(*(struct in_addr *)&offeredIp));
+	    printf("%s", inet_ntoa(*(struct in_addr *)&offeredIp));
 
-    makeRequest(dhcpRequest, mac, dhcpServerId, &xid, &offeredIp);
-    sendRequestAndReceiveAck(dhcpRequest, &socket);
+	    makeRequest(dhcpRequest, mac, dhcpServerId, &xid, &offeredIp);
+	    sendRequestAndReceiveAck(dhcpRequest, &socket);	
+    }
+
 
 
     if ((close(socket)) == -1)      // close the socket
@@ -155,7 +164,9 @@ void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid) {
     dhcpDiscover->yiaddr = 0;
     dhcpDiscover->siaddr = 0;
     dhcpDiscover->giaddr = 0;
-    memcpy(&dhcpDiscover->chaddr, &mac, sizeof(mac));
+    memcpy(dhcpDiscover->chaddr, mac, 16);
+    printf("\n %d \n", sizeof(mac));
+
     dhcpDiscover->magic_cookie = htonl(0x63825363);
    	
    	uint8_t option = DHCP_OPTION_DISCOVER;
@@ -200,15 +211,13 @@ dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket) {
 
 	while ((n= recvfrom(*socket, dhcpOffer, sizeof(dhcp), 0, (struct sockaddr *) &addr, &addrlen)) >= 0) {
 		if (flag) {
-			cout << "dhcp som tu" << flush;
 			return *dhcpOffer;
 		}
 	}
 
 	if (dhcpOffer->bp_options[2] == (uint8_t)02) {
 		printf("DHCP OFFER received\n");
-		cout << "dhcp som tu" << flush;
-    	printf("%s", inet_ntoa(*(struct in_addr *)&dhcpOffer->yiaddr));
+    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpOffer->yiaddr));
 		return *dhcpOffer;
 	}
 
@@ -229,10 +238,9 @@ void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uin
     dhcpRequest->yiaddr = *offeredIp;
     dhcpRequest->siaddr = 0;
     dhcpRequest->giaddr = 0;
-    memcpy(&dhcpRequest->chaddr, &mac, sizeof(mac));
+
+    memcpy(dhcpRequest->chaddr, mac, 16);
     dhcpRequest->magic_cookie = htonl(0x63825363);
-    cout << "\nmake request2\n";
-   	cout << "\nmake request\n";
    	printf("%s\n", inet_ntoa(*(struct in_addr *)offeredIp));
    	uint8_t option = DHCP_OPTION_REQUEST;
    	fill_dhcp_option(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
@@ -289,11 +297,12 @@ void getMacAddress(uint8_t *mac, uint32_t *xid) {
 		mac[3] = mac[3] + 1;
 	}
 
-	xid = xid + 1;
+	*xid = *xid + 1;
 	// int result = getMacAddress(interface, mac);
 }
 
 void sigCatch(int sig) {
+	cout << "\nSIGINT CATCH\n";
 	flag = 1;
 }
 
