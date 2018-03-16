@@ -68,12 +68,31 @@ int main(int argc, char **argv) {
 
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
+	uint8_t mac[6];
+	/* Pociatocny random transaction id */
+	uint32_t xid = htonl(0x01010000);
+
+	// getMacAddress(mac);
+
 	dhcp_t *dhcpDiscover = new dhcp;
 	int socket;
 
-	configureSocket(&socket, inputStruct->interface);
+	uint32_t serverIp = configureSocket(&socket, inputStruct->interface);
 
 	*dhcpDiscover = waitForDiscover(&socket);
+
+	dhcp_t *dhcpOffer = new dhcp;
+
+	uint32_t offeredIp;
+	ipStringToNumber("192.168.1.11", &offeredIp);
+	// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
+	makeOffer(dhcpOffer, dhcpDiscover, mac, &xid, offeredIp, serverIp, inputStruct);
+	
+	int i = 0;
+	for(i = 0; i<300; i++) {
+		printf("%02x ", (unsigned char)dhcpOffer->bp_options[i]);
+	}
+	sendOfferAndReceiveRequest(&socket, dhcpOffer, serverIp);
 
 	if ((close(socket)) == -1)      // close the socket
 	err(1,"close() failed");
@@ -81,18 +100,66 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/**
+ * Convert human readable IPv4 address to UINT32
+ * @param pDottedQuad   Input C string e.g. "192.168.0.1"
+ * @param pIpAddr       Output IP address as UINT32
+ * return 1 on success, else 0
+ */
+int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr) {
+	unsigned int            byte3;
+	unsigned int            byte2;
+	unsigned int            byte1;
+	unsigned int            byte0;
+	char              dummyString[2];
+
+	/* The dummy string with specifier %1s searches for a non-whitespace char
+	* after the last number. If it is found, the result of sscanf will be 5
+	* instead of 4, indicating an erroneous format of the ip-address.
+	*/
+	if (sscanf (pDottedQuad, "%u.%u.%u.%u%1s",
+	              &byte3, &byte2, &byte1, &byte0, dummyString) == 4)
+	{
+	  if (    (byte3 < 256)
+	       && (byte2 < 256)
+	       && (byte1 < 256)
+	       && (byte0 < 256)
+	     )
+	  {
+	     *pIpAddr  =   (byte3 << 24)
+	                 + (byte2 << 16)
+	                 + (byte1 << 8)
+	                 +  byte0;
+
+	     return 1;
+	  }
+	}
+
+	return 0;
+}
+
+int getMacAddress(string interface, uint8_t *mac) {
+  struct ifreq s;
+  int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+
+  strcpy(s.ifr_name, "eth1");
+  if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
+  	memcpy((void *)mac, s.ifr_addr.sa_data, 6);
+    int i;
+    for (i = 0; i < 6; ++i)
+      printf(" %02x", (unsigned char) s.ifr_addr.sa_data[i]);
+    puts("\n");
+    return 0;
+  }
+  return 1;
+}
+
 dhcp_t waitForDiscover(int *socket) {
 	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
-
-	// memset(&addrIn,0,sizeof(addrIn));
-	// addrIn.sin_family=AF_INET;
-	// addrIn.sin_addr.s_addr=inet_addr("255.255.255.255");
-	// addrIn.sin_port=htons(67);
 	
 	dhcp_t *dhcpDiscover = new dhcp;
-	cout << "tutuddtt \n" << flush;
 		/* Citanie dat zo socketu */
 	while ((n= recvfrom(*socket, dhcpDiscover, sizeof(dhcp), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
 		if (flag) {
@@ -108,8 +175,76 @@ dhcp_t waitForDiscover(int *socket) {
 		return *dhcpDiscover;
 	}
 }
+void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid, uint32_t offeredIp, uint32_t serverIp, input_t *input) {
+	dhcpOffer->opcode = 2;
+	dhcpOffer->htype = 1;
+	dhcpOffer->hlen = 6;
+	dhcpOffer->hops = 0;
+	dhcpOffer->xid = *xid;
+	dhcpOffer->secs = 0;
+	dhcpOffer->flags = htons(0x8000);
+	dhcpOffer->ciaddr = 0;
+	dhcpOffer->yiaddr = offeredIp;
+	dhcpOffer->siaddr = serverIp;
+	dhcpOffer->giaddr = 0;
+	memcpy(dhcpOffer->chaddr, mac, DHCP_CHADDR_LEN);
+	dhcpOffer->magic_cookie = htonl(0x63825363);
 
-void configureSocket(int *sock, string interface) {
+	uint8_t option = DHCP_OPTION_OFFER;
+	fillDhcpOptions(&dhcpOffer->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
+
+	uint32_t subnetMask;
+	ipStringToNumber("255.255.255.0", &subnetMask);
+	fillDhcpOptions(&dhcpOffer->bp_options[3], MESSAGE_TYPE_REQ_SUBNET_MASK, (u_int8_t *)&subnetMask, sizeof(uint32_t));
+
+	uint32_t gateway;
+	ipStringToNumber(input->gateway.c_str(), &subnetMask);
+	fillDhcpOptions(&dhcpOffer->bp_options[9], MESSAGE_TYPE_ROUTER, (u_int8_t *)&gateway, sizeof(uint32_t));
+
+	uint32_t leaseTime = htons(input->leasetime);
+	fillDhcpOptions(&dhcpOffer->bp_options[15], MESSAGE_TYPE_LEASE_TIME, (u_int8_t *)&leaseTime, sizeof(uint32_t));
+
+	fillDhcpOptions(&dhcpOffer->bp_options[21], MESSAGE_TYPE_DHCP_SERVER, (u_int8_t *)&serverIp, sizeof(uint32_t));
+
+	uint32_t dnsServerIp;
+	ipStringToNumber(input->dns.c_str(), &dnsServerIp);
+	fillDhcpOptions(&dhcpOffer->bp_options[28], MESSAGE_TYPE_DNS, (u_int8_t *)&dnsServerIp, sizeof(uint32_t));
+
+	option = 0;
+   	fillDhcpOptions(&dhcpOffer->bp_options[34], MESSAGE_TYPE_END, &option, 0);
+}
+
+dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serverIp) {
+	int n;
+	struct sockaddr_in   addrIn, addrOut;
+	socklen_t addrlen;
+
+	memset(&addrOut,0,sizeof(addrOut));
+	addrOut.sin_family=AF_INET;
+	addrOut.sin_addr.s_addr=inet_addr("255.255.255.255");
+	addrOut.sin_port=htons(68);
+
+	/* Odoslanie struktury na dany socket */
+	if (sendto(*socket, dhcpOffer, sizeof(dhcp),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
+		err(1,"sendto");
+
+	dhcp_t *dhcpRequest = new dhcp;
+
+	/* Citanie dat zo socketu */
+	while ((n= recvfrom(*socket, dhcpRequest, sizeof(dhcp), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
+		if (flag) {
+			return *dhcpRequest;
+		}
+	}
+
+	if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
+		printf("DHCP REQUEST received\n");
+    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpRequest->yiaddr));
+		return *dhcpOffer;
+	}
+}
+
+uint32_t configureSocket(int *sock, string interface) {
 	struct sockaddr_in   addrIn;   // Datova struktura adries
 	struct ifreq ifr;
 
@@ -156,6 +291,16 @@ void configureSocket(int *sock, string interface) {
 		err(1,"close() failed");
 		err(1,"fail");
 	}
+
+	uint32_t dhcpServerIp;
+	ipStringToNumber(inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), &dhcpServerIp);
+	return dhcpServerIp;
+}
+
+void fillDhcpOptions(uint8_t *packetOptionPart, uint8_t code, uint8_t *data, u_int8_t len) {
+    packetOptionPart[0] = code;
+    packetOptionPart[1] = len;
+    memcpy(&packetOptionPart[2], data, len);
 }
 
 void sigCatch(int sig) {

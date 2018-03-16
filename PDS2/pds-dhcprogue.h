@@ -28,7 +28,9 @@ using namespace std;
 #define MESSAGE_TYPE_DNS                    6
 #define MESSAGE_TYPE_DOMAIN_NAME            15
 #define MESSAGE_TYPE_REQ_IP                 50
+#define MESSAGE_TYPE_LEASE_TIME             51
 #define MESSAGE_TYPE_DHCP                   53
+#define MESSAGE_TYPE_DHCP_SERVER            54
 #define MESSAGE_TYPE_PARAMETER_REQ_LIST     55
 #define MESSAGE_TYPE_END                    255
 
@@ -84,7 +86,11 @@ typedef struct dhcp {
     uint8_t    bp_options[DHCP_OPTIONS_LEN];
 } dhcp_t;
 
+void getMacAddress(uint8_t *mac);
 dhcp_t waitForDiscover(int *socket);
+int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
+void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serverIp);
 
 /**
     Handler pri odchyteni ukoncujuceho signalu.
@@ -101,7 +107,19 @@ void sigCatch(int sig);
     @param interface Interface zadany zo vstupnych argumentov
     @return void
 */
-void configureSocket(int *sock, string interface);
+uint32_t configureSocket(int *sock, string interface);
+
+/**
+    Pomocna funkcia na naplnenie pola Options v DHCP packetoch
+
+    @param *packetOptionPart Cast options packetu do ktorej vkladame nove data
+    @param code Kod option
+    @param *data Vkladane data
+    @param len Dlzka vkladanych dat
+    @return void
+*/
+void fillDhcpOptions(uint8_t *packetOptionPart, uint8_t code, uint8_t *data, uint8_t len);
+
 
 /*
 *   Funkcia na vypis error statusov
