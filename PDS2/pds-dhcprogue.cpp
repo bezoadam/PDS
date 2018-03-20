@@ -207,7 +207,7 @@ void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t 
 	gateway = htonl(gateway);
 	fillDhcpOptions(&dhcpOffer->bp_options[9], MESSAGE_TYPE_ROUTER, (u_int8_t *)&gateway, sizeof(uint32_t));
 
-	uint32_t leaseTime = htons(input->leasetime);
+	uint32_t leaseTime = htonl(uint32_t(input->leasetime));
 	fillDhcpOptions(&dhcpOffer->bp_options[15], MESSAGE_TYPE_LEASE_TIME, (u_int8_t *)&leaseTime, sizeof(uint32_t));
 
 	fillDhcpOptions(&dhcpOffer->bp_options[21], MESSAGE_TYPE_DHCP_SERVER, (u_int8_t *)&serverIp, sizeof(uint32_t));
