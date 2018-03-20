@@ -89,7 +89,7 @@ typedef struct dhcp {
 void getMacAddress(uint8_t *mac);
 dhcp_t waitForDiscover(int *socket);
 int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
-void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t offeredIp, uint32_t serverIp, input_t *input);
 dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serverIp);
 
 /**

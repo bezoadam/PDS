@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 
 	uint8_t mac[6];
 	/* Pociatocny random transaction id */
-	uint32_t xid = htonl(0x01010000);
+	// uint32_t xid = htonl(0x01010000);
 
 	// getMacAddress(mac);
 
@@ -85,13 +85,14 @@ int main(int argc, char **argv) {
 
 	uint32_t offeredIp;
 	ipStringToNumber("192.168.1.11", &offeredIp);
-	// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
-	makeOffer(dhcpOffer, dhcpDiscover, mac, &xid, offeredIp, serverIp, inputStruct);
 	
-	int i = 0;
-	for(i = 0; i<300; i++) {
-		printf("%02x ", (unsigned char)dhcpOffer->bp_options[i]);
-	}
+	// int i = 0;
+	// for(i = 0; i<300; i++) {
+	// 	printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
+	// }
+	// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
+	makeOffer(dhcpOffer, dhcpDiscover, mac, htonl(offeredIp), htonl(serverIp), inputStruct);
+
 	sendOfferAndReceiveRequest(&socket, dhcpOffer, serverIp);
 
 	if ((close(socket)) == -1)      // close the socket
@@ -175,12 +176,12 @@ dhcp_t waitForDiscover(int *socket) {
 		return *dhcpDiscover;
 	}
 }
-void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid, uint32_t offeredIp, uint32_t serverIp, input_t *input) {
+void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t offeredIp, uint32_t serverIp, input_t *input) {
 	dhcpOffer->opcode = 2;
 	dhcpOffer->htype = 1;
 	dhcpOffer->hlen = 6;
 	dhcpOffer->hops = 0;
-	dhcpOffer->xid = *xid;
+	memcpy(&dhcpOffer->xid, &dhcpDiscover->xid, 4);
 	dhcpOffer->secs = 0;
 	dhcpOffer->flags = htons(0x8000);
 	dhcpOffer->ciaddr = 0;
@@ -195,10 +196,12 @@ void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t 
 
 	uint32_t subnetMask;
 	ipStringToNumber("255.255.255.0", &subnetMask);
+	subnetMask = htonl(subnetMask);
 	fillDhcpOptions(&dhcpOffer->bp_options[3], MESSAGE_TYPE_REQ_SUBNET_MASK, (u_int8_t *)&subnetMask, sizeof(uint32_t));
 
 	uint32_t gateway;
-	ipStringToNumber(input->gateway.c_str(), &subnetMask);
+	ipStringToNumber(input->gateway.c_str(), &gateway);
+	gateway = htonl(gateway);
 	fillDhcpOptions(&dhcpOffer->bp_options[9], MESSAGE_TYPE_ROUTER, (u_int8_t *)&gateway, sizeof(uint32_t));
 
 	uint32_t leaseTime = htons(input->leasetime);
@@ -208,10 +211,11 @@ void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t 
 
 	uint32_t dnsServerIp;
 	ipStringToNumber(input->dns.c_str(), &dnsServerIp);
-	fillDhcpOptions(&dhcpOffer->bp_options[28], MESSAGE_TYPE_DNS, (u_int8_t *)&dnsServerIp, sizeof(uint32_t));
+	dnsServerIp = htonl(dnsServerIp);
+	fillDhcpOptions(&dhcpOffer->bp_options[27], MESSAGE_TYPE_DNS, (u_int8_t *)&dnsServerIp, sizeof(uint32_t));
 
 	option = 0;
-   	fillDhcpOptions(&dhcpOffer->bp_options[34], MESSAGE_TYPE_END, &option, 0);
+   	fillDhcpOptions(&dhcpOffer->bp_options[33], MESSAGE_TYPE_END, &option, 0);
 }
 
 dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serverIp) {
