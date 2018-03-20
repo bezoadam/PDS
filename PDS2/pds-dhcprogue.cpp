@@ -79,8 +79,9 @@ int main(int argc, char **argv) {
 
 	uint32_t serverIp = configureSocket(&socket, inputStruct->interface);
 
+	cout << "\noffer 1";
 	*dhcpDiscover = waitForDiscover(&socket);
-
+	cout << "\noffer 2";
 	dhcp_t *dhcpOffer = new dhcp;
 
 	uint32_t offeredIp;
@@ -93,7 +94,10 @@ int main(int argc, char **argv) {
 	// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
 	makeOffer(dhcpOffer, dhcpDiscover, mac, htonl(offeredIp), htonl(serverIp), inputStruct);
 
-	sendOfferAndReceiveRequest(&socket, dhcpOffer, serverIp);
+	dhcp_t *dhcpRequest = new dhcp;
+
+	*dhcpRequest = sendOfferAndReceiveRequest(&socket, dhcpOffer, serverIp);
+	
 
 	if ((close(socket)) == -1)      // close the socket
 	err(1,"close() failed");
@@ -169,7 +173,7 @@ dhcp_t waitForDiscover(int *socket) {
 		}
 	}
 
-	cout << "received \n" << flush;
+	cout << "received \n";
 
 	if (dhcpDiscover->bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
 		printf("DHCP DISCOVER received\n");
@@ -188,9 +192,8 @@ void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t 
 	dhcpOffer->yiaddr = offeredIp;
 	dhcpOffer->siaddr = serverIp;
 	dhcpOffer->giaddr = 0;
-	memcpy(dhcpOffer->chaddr, mac, DHCP_CHADDR_LEN);
+	memcpy(dhcpOffer->chaddr, dhcpDiscover->chaddr, DHCP_CHADDR_LEN);
 	dhcpOffer->magic_cookie = htonl(0x63825363);
-
 	uint8_t option = DHCP_OPTION_OFFER;
 	fillDhcpOptions(&dhcpOffer->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
 
@@ -234,6 +237,7 @@ dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serve
 
 	dhcp_t *dhcpRequest = new dhcp;
 
+	cout << "\nwaiting for receive\n";
 	/* Citanie dat zo socketu */
 	while ((n= recvfrom(*socket, dhcpRequest, sizeof(dhcp), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
 		if (flag) {
