@@ -42,7 +42,13 @@ using namespace std;
 #define DHCP_CHADDR_LEN  16
 #define DHCP_SNAME_LEN   64
 #define DHCP_FILE_LEN    128
-#define DHCP_OPTIONS_LEN 600
+#define DHCP_OPTIONS_LEN 300
+
+#define INT_TO_ADDR(_addr) \
+(_addr & 0xFF), \
+(_addr >> 8 & 0xFF), \
+(_addr >> 16 & 0xFF), \
+(_addr >> 24 & 0xFF)
 
 enum {
     NO_ERR = 0,     //0
@@ -56,8 +62,8 @@ const char *errors[] = {
 
 typedef struct input {
     string interface;
-    string startPool;
-    string endPool;
+    uint32_t startPool;
+    uint32_t endPool;
     string gateway;
     string dns;
     string domain;
@@ -86,11 +92,14 @@ typedef struct dhcp {
     uint8_t    bp_options[DHCP_OPTIONS_LEN];
 } dhcp_t;
 
-void getMacAddress(uint8_t *mac);
+void sendAck(int *socket, dhcp_t *dhcpAck);
+void makeAck(dhcp_t *dhcpAck, dhcp_t *dhcpRequest, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+uint32_t incrementIpAddress(uint32_t lastUsedIp);
+void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress);
 dhcp_t waitForDiscover(int *socket);
 int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
-void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t offeredIp, uint32_t serverIp, input_t *input);
-dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer, uint32_t serverIp);
+void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer);
 
 /**
     Handler pri odchyteni ukoncujuceho signalu.

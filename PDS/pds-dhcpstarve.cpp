@@ -109,7 +109,7 @@ void configureSocket(int *sock, string interface) {
 
 	memset(&addrIn,0,sizeof(addrIn));
 	addrIn.sin_family=AF_INET;
-	addrIn.sin_addr.s_addr=htonl(INADDR_ANY);
+	addrIn.sin_addr.s_addr=inet_addr("0.0.0.0");
 	addrIn.sin_port=htons(68);
 
 	/* Vytvorenie socketu */
@@ -151,7 +151,7 @@ void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid) {
     dhcpDiscover->yiaddr = 0;
     dhcpDiscover->siaddr = 0;
     dhcpDiscover->giaddr = 0;
-    memcpy(dhcpDiscover->chaddr, mac, 6);
+    memcpy(dhcpDiscover->chaddr, mac, DHCP_CHADDR_LEN);
 
     dhcpDiscover->magic_cookie = htonl(0x63825363);
    	
@@ -216,7 +216,7 @@ void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uin
     dhcpRequest->siaddr = 0;
     dhcpRequest->giaddr = 0;
 
-    memcpy(dhcpRequest->chaddr, mac, 6);
+    memcpy(dhcpRequest->chaddr, mac, DHCP_CHADDR_LEN);
     dhcpRequest->magic_cookie = htonl(0x63825363);
    	printf("%s\n", inet_ntoa(*(struct in_addr *)offeredIp));
    	uint8_t option = DHCP_OPTION_REQUEST;
