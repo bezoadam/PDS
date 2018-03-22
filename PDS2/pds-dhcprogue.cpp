@@ -84,11 +84,14 @@ int main(int argc, char **argv) {
 	memcpy(&offeredIp, &inputStruct->startPool, 4);
 	offeredIp = htonl(offeredIp);
 	// ipStringToNumber(inputStruct->startPool.c_str(), &offeredIp);
-	Dhcp dhcpDiscover = Dhcp();
-	Dhcp dhcpOffer = Dhcp();
-	Dhcp dhcpRequest = Dhcp();
-	Dhcp dhcpAck = Dhcp();
-
+	Dhcp dhcpDiscover;
+	memset(&dhcpDiscover,0, sizeof(dhcpDiscover));
+	Dhcp dhcpOffer;
+	memset(&dhcpOffer,0, sizeof(dhcpOffer));
+	Dhcp dhcpRequest;
+	memset(&dhcpRequest,0, sizeof(dhcpRequest));
+	Dhcp dhcpAck;
+	memset(&dhcpAck,0, sizeof(dhcpAck));
 	if (offeredIp == htonl(inputStruct->endPool)) {
 		cout << "\n takto pochop uz je konec \n";
 		return 1;
