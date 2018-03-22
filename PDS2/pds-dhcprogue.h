@@ -92,14 +92,86 @@ typedef struct dhcp {
     uint8_t    bp_options[DHCP_OPTIONS_LEN];
 } dhcp_t;
 
-void sendAck(int *socket, dhcp_t *dhcpAck);
-void makeAck(dhcp_t *dhcpAck, dhcp_t *dhcpRequest, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+/**
+    Incrementovanie poslednej pouzitej IP adresy
+
+    @param lastUsedIp ip adresa
+    @return uint32_t 
+*/
 uint32_t incrementIpAddress(uint32_t lastUsedIp);
+
+/**
+    Ziskanie mac adresy a broadcast adresy z prislusneho rozhrania
+
+    @param interface rozhranie
+    @param *mac Odkaz na polem mac
+    @param *broadcastAddress Odkaz na broadcast adresu
+    @return void
+*/
 void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress);
-dhcp_t waitForDiscover(int *socket);
+
+/**
+    Pomocna funkcia na konverziu ip adresy v char[] formate na uint32_t format
+
+    @param pDottedQuad ip adresa v char[]
+    @param *pIpAddr Odkaz na ip adresu v uint32_t
+    @return int
+*/
 int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
+
+/**
+    Cakanie na disover packet.
+
+    @param *socket odkaz na socket
+    @return dhcp_t struktura discover packetu
+*/
+dhcp_t waitForDiscover(int *socket);
+
+/**
+    Naplnenie Offer packetu odpovedajucimi hodnotami.
+
+    @param *dhcpOffer Odkaz na strukturu Offer packetu
+    @param *dhcpDiscover Odkaz na strukturu Discover packetu
+    @param mac[] Mac adresa rozhrania
+    @param interfaceBroadcastAddress Broadcast adresa rozhrania
+    @param offeredIp Odkaz na ponukanu ip adresu
+    @param serverIp Odkaz na gateway adresu 
+    @param *input Odkaz na vstupnu strukturu
+    @return int
+*/
 void makeOffer(dhcp_t *dhcpOffer, dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+
+/**
+    Odoslanie Offer packetu na rozhranie a ziskanie Request packetu
+
+    @param *socket Odkaz na socket
+    @param *dhcpOffer Odkaz na strukturu offer packetu
+    @return dhcp_t
+*/
 dhcp_t sendOfferAndReceiveRequest(int *socket, dhcp_t *dhcpOffer);
+
+/**
+    Naplnenie Ack packetu odpovedajucimi hodnotami.
+
+    @param *dhcpAck 
+    @param *dhcpRequest
+    @param mac[]
+    @param interfaceBroadcastAddress
+    @param offeredIp
+    @param serverIp
+    @param *input
+    @return int
+*/
+void makeAck(dhcp_t *dhcpAck, dhcp_t *dhcpRequest, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
+
+/**
+    Odoslanie Ack packetu na rozhranie.
+
+    @param *socket
+    @param *dhcpAck 
+    @return int
+*/
+void sendAck(int *socket, dhcp_t *dhcpAck);
 
 /**
     Handler pri odchyteni ukoncujuceho signalu.
