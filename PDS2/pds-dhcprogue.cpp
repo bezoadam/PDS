@@ -279,22 +279,17 @@ void waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 	cout << "\n zasek \n" << flush;
 
 	while (1) {
-		while ((n= recvfrom(*socket, dhcpDiscover, sizeof(*dhcpDiscover), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
-			if (flag) {
-				cout << "data";
-				return;
-			}
-			cout << "\nloop\n" << flush;
+		if (recvfrom(*socket, dhcpDiscover, sizeof(*dhcpDiscover), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
+			cout << n << flush;
+			cout << "som tu" << flush;
+			flag = 1;
+			return;
 		}
 		printf("f %d %d %d %d", INT_TO_ADDR(dhcpDiscover->yiaddr));
 		cout << "received \n" << flush;
 
 		if (dhcpDiscover->bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
 			printf("DHCP DISCOVER received\n");
-			int i;
-			for(i = 0; i<300; i++) {
-				printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
-			}
 			return;
 		}
 	}
@@ -365,10 +360,9 @@ void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest)
 
 	while(1) {
 		/* Citanie dat zo socketu */
-		while ((n= recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
-			if (flag) {
-				return;
-			}
+		if (recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
+			flag = 1;
+			return;
 		}
 
 		if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
@@ -377,8 +371,6 @@ void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest)
 			return;
 		}	
 	}
-	// while (1) {
-	// }
 }
 
 uint32_t configureSocket(int *sock, string interface) {
