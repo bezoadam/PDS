@@ -85,47 +85,51 @@ int main(int argc, char **argv) {
 	offeredIp = htonl(offeredIp);
 	// ipStringToNumber(inputStruct->startPool.c_str(), &offeredIp);
 	Dhcp dhcpDiscover;
-	memset(&dhcpDiscover,0, sizeof(dhcpDiscover));
 	Dhcp dhcpOffer;
-	memset(&dhcpOffer,0, sizeof(dhcpOffer));
 	Dhcp dhcpRequest;
-	memset(&dhcpRequest,0, sizeof(dhcpRequest));
 	Dhcp dhcpAck;
-	memset(&dhcpAck,0, sizeof(dhcpAck));
-	if (offeredIp == htonl(inputStruct->endPool)) {
-		cout << "\n takto pochop uz je konec \n";
-		return 1;
+
+	while(1) {
+		memset(&dhcpDiscover,0, sizeof(dhcpDiscover));
+		memset(&dhcpOffer,0, sizeof(dhcpOffer));
+		memset(&dhcpRequest,0, sizeof(dhcpRequest));
+		memset(&dhcpAck,0, sizeof(dhcpAck));
+		if (offeredIp == htonl(inputStruct->endPool)) {
+			cout << "\n takto pochop uz je konec \n";
+			return 1;
+		}
+		waitForDiscover(&socket, &dhcpDiscover);
+		if (flag) {
+			return 1;
+		}
+
+		// uint32_t offeredIp;
+		// ipStringToNumber("192.168.1.11", &offeredIp);
+		
+		// int i = 0;
+		// for(i = 0; i<300; i++) {
+		// 	printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
+		// }
+		// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
+		makeOffer(&dhcpOffer, &dhcpDiscover, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
+
+
+		sendOfferAndReceiveRequest(&socket, &dhcpOffer, &dhcpRequest);
+		if (flag) {
+
+			return 1;
+		}		
+		
+
+		makeAck(&dhcpAck, &dhcpRequest, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
+
+		sendAck(&socket, &dhcpAck);
+
+		offeredIp = incrementIpAddress(offeredIp);
+
+		// while(1) {
+		// }	
 	}
-	dhcpDiscover = waitForDiscover(&socket);
-	if (flag) {
-		return 1;
-	}
-
-	// uint32_t offeredIp;
-	// ipStringToNumber("192.168.1.11", &offeredIp);
-	
-	// int i = 0;
-	// for(i = 0; i<300; i++) {
-	// 	printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
-	// }
-	// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
-	makeOffer(&dhcpOffer, &dhcpDiscover, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
-
-
-	sendOfferAndReceiveRequest(&socket, &dhcpOffer, &dhcpRequest);
-	if (flag) {
-
-		return 1;
-	}		
-	
-
-	makeAck(&dhcpAck, &dhcpRequest, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
-
-	sendAck(&socket, &dhcpAck);
-
-	offeredIp = incrementIpAddress(offeredIp);
-	// while(1) {
-	// }
 
 
 	if ((close(socket)) == -1)      // close the socket
@@ -264,28 +268,35 @@ void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress) {
   }
 }
 
-Dhcp waitForDiscover(int *socket) {
+void waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
 	
 
-	cout << "\n waiting for discover \n";
-	Dhcp dhcpDiscover = Dhcp();
+	cout << "\n waiting for discover \n" << flush;
 	/* Citanie dat zo socketu */
-	cout << "\n zasek \n";
-	while ((n= recvfrom(*socket, &dhcpDiscover, sizeof(dhcpDiscover), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
-		if (flag) {
-			cout << "data";
-			return dhcpDiscover;
-		}
-	}
-	printf("f %d %d %d %d", INT_TO_ADDR(dhcpDiscover.yiaddr));
-	cout << "received \n" << flush;
+	cout << "\n zasek \n" << flush;
 
-	if (dhcpDiscover.bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
-		printf("DHCP DISCOVER received\n");
-		return dhcpDiscover;
+	while (1) {
+		while ((n= recvfrom(*socket, dhcpDiscover, sizeof(*dhcpDiscover), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
+			if (flag) {
+				cout << "data";
+				return;
+			}
+			cout << "\nloop\n" << flush;
+		}
+		printf("f %d %d %d %d", INT_TO_ADDR(dhcpDiscover->yiaddr));
+		cout << "received \n" << flush;
+
+		if (dhcpDiscover->bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
+			printf("DHCP DISCOVER received\n");
+			int i;
+			for(i = 0; i<300; i++) {
+				printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
+			}
+			return;
+		}
 	}
 	// while (1) {
 	// }
@@ -352,17 +363,19 @@ void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest)
 
 	cout << "\nwaiting for receive\n";
 
-	/* Citanie dat zo socketu */
-	while ((n= recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
-		if (flag) {
-			return;
+	while(1) {
+		/* Citanie dat zo socketu */
+		while ((n= recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen)) >= 0) {
+			if (flag) {
+				return;
+			}
 		}
-	}
 
-	if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
-		printf("DHCP REQUEST received\n");
-    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpRequest->yiaddr));
-		return;
+		if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
+			printf("DHCP REQUEST received\n");
+	    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpRequest->yiaddr));
+			return;
+		}	
 	}
 	// while (1) {
 	// }

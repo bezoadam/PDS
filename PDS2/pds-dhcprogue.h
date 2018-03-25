@@ -125,7 +125,7 @@ int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
     @param *socket odkaz na socket
     @return dhcp_t struktura discover packetu
 */
-Dhcp waitForDiscover(int *socket);
+void waitForDiscover(int *socket, Dhcp *dhcpDiscover);
 
 /**
     Naplnenie Offer packetu odpovedajucimi hodnotami.
