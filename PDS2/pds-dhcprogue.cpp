@@ -11,7 +11,6 @@ int main(int argc, char **argv) {
   
   	int ch;
  	bool isInterface, isPool, isGateway, isDns, isDomain, isLeasetime = false;
- 	int resultStart, resultEnd;
  	input_t *inputStruct = new input;
  	int socket;
 	string pool, delimeter = "-";
@@ -24,8 +23,8 @@ int main(int argc, char **argv) {
 				break;
 			case 'p' :
 				pool = optarg;
-				resultStart = ipStringToNumber((pool.substr(0, pool.find(delimeter))).c_str(), &(inputStruct->startPool));
-				resultEnd = ipStringToNumber((pool.substr(pool.find(delimeter) + 1, pool.length())).c_str(), &(inputStruct->endPool));
+				ipStringToNumber((pool.substr(0, pool.find(delimeter))).c_str(), &(inputStruct->startPool));
+				ipStringToNumber((pool.substr(pool.find(delimeter) + 1, pool.length())).c_str(), &(inputStruct->endPool));
 				isPool = true;
 				break;
 			case 'g' :
@@ -46,19 +45,19 @@ int main(int argc, char **argv) {
 				isLeasetime = true;
 				if (*t != '\0') {
 					print_error(ERR_BADPARAMS);
-					exit(ERR_BADPARAMS);
+					return ERR_BADPARAMS;
 				}
 				break;
 			default :
 				print_error(ERR_BADPARAMS);
-				exit(ERR_BADPARAMS);
+				return ERR_BADPARAMS;
 				break;
 		}
 	}
 
 	if ((isInterface && isPool && isGateway && isDns && isDomain && isLeasetime) == false) {
 		print_error(ERR_BADPARAMS);
-		exit(ERR_BADPARAMS);
+		return ERR_BADPARAMS;
 	}
 
 	/* Odchytenie SIG INT signalu */
@@ -90,53 +89,65 @@ int main(int argc, char **argv) {
 		memset(&dhcpRequest,0, sizeof(dhcpRequest));
 		memset(&dhcpAck,0, sizeof(dhcpAck));
 		if (offeredIp == htonl(inputStruct->endPool)) {
-			cout << "\n takto pochop uz je konec \n";
-			if ((close(socket)) == -1)      // close the socket
-			err(1,"close() failed");
-			printf("Closing socket ...\n");
-			return 1;
-		}
-		waitForDiscover(&socket, &dhcpDiscover);
-		if (flag) {
-			if ((close(socket)) == -1)      // close the socket
-			err(1,"close() failed");
-			printf("Closing socket ...\n");
-			return 1;
+			if ((close(socket)) == -1) {
+				print_error(SOCKET_ERR);
+				return SOCKET_ERR;
+			}
+			cout << "Vycerpany adresny pool adries. \n";
+			return NO_ERR;
 		}
 
-		// uint32_t offeredIp;
-		// ipStringToNumber("192.168.1.11", &offeredIp);
-		
-		// int i = 0;
-		// for(i = 0; i<300; i++) {
-		// 	printf("%02x ", (unsigned char)dhcpDiscover->bp_options[i]);
-		// }
-		// std::cout << std::setfill('0') << std::setw(8) << std::hex << ip << '\n';
+		int waitForDiscoverResult = waitForDiscover(&socket, &dhcpDiscover);
+
+		if (waitForDiscoverResult == SIG_INT) {
+			return NO_ERR;
+		} else if (waitForDiscoverResult != NO_ERR) {
+			print_error(waitForDiscoverResult);
+			if ((close(socket)) == -1) {
+				print_error(SOCKET_ERR);
+				return SOCKET_ERR;
+			}
+			return waitForDiscoverResult;
+		}
+
 		makeOffer(&dhcpOffer, &dhcpDiscover, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
 
-		sendOfferAndReceiveRequest(&socket, &dhcpOffer, &dhcpRequest);
-		if (flag) {
-			if ((close(socket)) == -1)      // close the socket
-			err(1,"close() failed");
-			printf("Closing socket ...\n");
-			return 1;
-		}		
-		
+		int sendOfferAndReceiveRequestResult = sendOfferAndReceiveRequest(&socket, &dhcpOffer, &dhcpRequest);
+		if (waitForDiscoverResult == SIG_INT) {
+			return NO_ERR;
+		} else if (sendOfferAndReceiveRequestResult != NO_ERR) {
+			print_error(sendOfferAndReceiveRequestResult);
+			if ((close(socket)) == -1) {
+				print_error(SOCKET_ERR);
+				return (SOCKET_ERR);				
+			}
+			return sendOfferAndReceiveRequestResult;
+		}
 
 		makeAck(&dhcpAck, &dhcpRequest, mac, interfaceBroadcastAddress, offeredIp, htonl(serverIp), inputStruct);
 
-		sendAck(&socket, &dhcpAck);
+		int sendAckResult = sendAck(&socket, &dhcpAck);
+		if (sendAckResult != NO_ERR) {
+			print_error(sendAckResult);
+			if ((close(socket)) == -1) {
+				print_error(SOCKET_ERR);
+				return (SOCKET_ERR);				
+			}
+			return sendAckResult;
+		}
 
 		offeredIp = incrementIpAddress(offeredIp);
 	}
 
-	if ((close(socket)) == -1)      // close the socket
-	err(1,"close() failed");
-	printf("Closing socket ...\n");
-    return 0;
+	if ((close(socket)) == -1) {
+		print_error(SOCKET_ERR);
+		return (SOCKET_ERR);
+	}
+
+    return NO_ERR;
 }
 
-void sendAck(int *socket, Dhcp *dhcpAck) {
+int sendAck(int *socket, Dhcp *dhcpAck) {
 	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
@@ -148,9 +159,10 @@ void sendAck(int *socket, Dhcp *dhcpAck) {
 
 	/* Odoslanie struktury na dany socket */
 	if (sendto(*socket, dhcpAck, sizeof(*dhcpAck),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
-		err(1,"sendto");
+		return SEND_ERR;
 
 	cout << "\nACK send\n";
+	return NO_ERR;
 }
 
 void makeAck(Dhcp *dhcpAck, Dhcp *dhcpRequest, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input) {
@@ -192,10 +204,10 @@ void makeAck(Dhcp *dhcpAck, Dhcp *dhcpRequest, uint8_t mac[], uint32_t interface
 }
 
 uint32_t incrementIpAddress(uint32_t lastUsedIp) {
-    // convert the input IP address to an integer
+    // konverzia vstupu na ip adresu
     in_addr_t address = lastUsedIp;
 
-    // add one to the value (making sure to get the correct byte orders)
+    // pricitanie adresy
     address = ntohl(address);
     address += 1;
     address = htonl(address);
@@ -203,70 +215,33 @@ uint32_t incrementIpAddress(uint32_t lastUsedIp) {
     return address;
 }
 
-/**
- * Convert human readable IPv4 address to UINT32
- * @param pDottedQuad   Input C string e.g. "192.168.0.1"
- * @param pIpAddr       Output IP address as UINT32
- * return 1 on success, else 0
- */
-int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr) {
-	unsigned int            byte3;
-	unsigned int            byte2;
-	unsigned int            byte1;
-	unsigned int            byte0;
-	char              dummyString[2];
+void ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr) {
+	unsigned int byte3, byte2, byte1, byte0;
+	char dummyString[2];
 
-	/* The dummy string with specifier %1s searches for a non-whitespace char
-	* after the last number. If it is found, the result of sscanf will be 5
-	* instead of 4, indicating an erroneous format of the ip-address.
-	*/
-	if (sscanf (pDottedQuad, "%u.%u.%u.%u%1s",
-	              &byte3, &byte2, &byte1, &byte0, dummyString) == 4)
-	{
-	  if (    (byte3 < 256)
-	       && (byte2 < 256)
-	       && (byte1 < 256)
-	       && (byte0 < 256)
-	     )
-	  {
-	     *pIpAddr  =   (byte3 << 24)
-	                 + (byte2 << 16)
-	                 + (byte1 << 8)
-	                 +  byte0;
-
-	     return 1;
-	  }
+	if (sscanf (pDottedQuad, "%u.%u.%u.%u%1s", &byte3, &byte2, &byte1, &byte0, dummyString) == 4) {
+		if ((byte3 < 256) && (byte2 < 256) && (byte1 < 256) && (byte0 < 256)) {
+			*pIpAddr = (byte3 << 24) + (byte2 << 16) + (byte1 << 8) +  byte0;
+		}
 	}
-
-	return 0;
 }
 
 void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress) {
   struct ifreq s;
   int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
 
-  strcpy(s.ifr_name, "eth1");
+  strcpy(s.ifr_name, interface.c_str());
   if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
   	memcpy((void *)mac, s.ifr_addr.sa_data, 6);
-    int i;
-    for (i = 0; i < 6; ++i)
-      printf(" %02x", (unsigned char) s.ifr_addr.sa_data[i]);
-    puts("\n");
   }
 
   if (ioctl(fd, SIOCGIFNETMASK, &s) == 0) {
   	uint32_t bc;
   	memcpy(broadcastAddress, &((struct sockaddr_in *)&s.ifr_netmask)->sin_addr, sizeof(uint32_t));
-  	int i = 0;
-    // for (i = 0; i < 4; ++i)
-    //   printf(" %sx", (unsigned char) bc[i]);
-    puts("\n");
-    printf("f %d %d %d %d", INT_TO_ADDR(*broadcastAddress));
-    printf("bc %s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_netmask)->sin_addr));
   }
 }
 
-void waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
+int waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
@@ -277,19 +252,20 @@ void waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 
 	while (1) {
 		if (recvfrom(*socket, dhcpDiscover, sizeof(*dhcpDiscover), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
-			cout << n << flush;
-			cout << "wtf\n" << flush;
-			flag = 1;
-			return;
+			if (flag == 1)
+				return SIG_INT;
+			return RECV_ERR;
 		}
 
 		cout << "\nreceived\n";
 
 		if (dhcpDiscover->bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
 			printf("DHCP DISCOVER received\n");
-			return;
+			return NO_ERR;
 		}
 	}
+
+	return OTHER_ERR;
 }
 void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input) {
 	dhcpOffer->opcode = 2;
@@ -329,7 +305,7 @@ void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t inte
    	fillDhcpOptions(&dhcpOffer->bp_options[33], MESSAGE_TYPE_END, &option, 0);
 }
 
-void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) {
+int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) {
 	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
@@ -340,23 +316,18 @@ void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest)
 	addrOut.sin_addr.s_addr=inet_addr("255.255.255.255");
 	addrOut.sin_port=htons(68);
 
-	int i;
-	for(i = 0; i<300; i++) {
-		printf("%02x ", (unsigned char)dhcpOffer->bp_options[i]);
-	}
-
 	/* Odoslanie struktury na dany socket */
 	if (sendto(*socket, dhcpOffer, sizeof(*dhcpOffer),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
-		err(1,"sendto");
+		return SEND_ERR;
 
 	cout << "\nwaiting for receive\n";
 
 	while(1) {
 		/* Citanie dat zo socketu */
 		if (recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
-			printf("recv err %d", errno);
-			flag = 1;
-			return;
+			if (flag == 1)
+				return SIG_INT;
+			return RECV_ERR;
 		}
 
 		cout << "\nreceived request\n";
@@ -364,9 +335,11 @@ void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest)
 		if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
 			printf("DHCP REQUEST received\n");
 	    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpRequest->yiaddr));
-			return;
+			return NO_ERR;
 		}	
 	}
+
+	return OTHER_ERR;
 }
 
 uint32_t configureSocket(int *sock, string interface) {
@@ -377,7 +350,7 @@ uint32_t configureSocket(int *sock, string interface) {
 
 	/* Vytvorenie socketu */
 	if ((*sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-	err(1,"socket failed()");
+	err(1,"socket creating failed");
 
 	/* I want to get an IPv4 IP address */
  	ifr.ifr_addr.sa_family = AF_INET;
@@ -442,5 +415,4 @@ void sigCatch(int sig) {
 
 void print_error(int err) {
 	cerr << errors[err] << endl;		//vypis na stderr
-	exit(err);
 }

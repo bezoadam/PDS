@@ -44,20 +44,23 @@ using namespace std;
 #define DHCP_FILE_LEN    128
 #define DHCP_OPTIONS_LEN 300
 
-#define INT_TO_ADDR(_addr) \
-(_addr & 0xFF), \
-(_addr >> 8 & 0xFF), \
-(_addr >> 16 & 0xFF), \
-(_addr >> 24 & 0xFF)
-
 enum {
-    NO_ERR = 0,     //0
-    ERR_BADPARAMS,  //1
+    NO_ERR = 0,      //0
+    ERR_BADPARAMS,   //1
+    SOCKET_ERR,      //2
+    SEND_ERR,        //3
+    RECV_ERR,        //4
+    OTHER_ERR,        //5
+    SIG_INT        //6
 };
 
 const char *errors[] = {
     "Ziadna chyba.",
-    "Chyba vo vstupnych parametroch"
+    "Chyba vo vstupnych parametroch",
+    "Chyba so socketom.",
+    "Chyba pri odosielani packetu",
+    "Chyba pri prijmani packetu",
+    "Neznama chyba"
 };
 
 typedef struct input {
@@ -117,7 +120,7 @@ void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress);
     @param *pIpAddr Odkaz na ip adresu v uint32_t
     @return int
 */
-int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
+void ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
 
 /**
     Cakanie na disover packet.
@@ -125,7 +128,7 @@ int ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
     @param *socket odkaz na socket
     @return dhcp_t struktura discover packetu
 */
-void waitForDiscover(int *socket, Dhcp *dhcpDiscover);
+int waitForDiscover(int *socket, Dhcp *dhcpDiscover);
 
 /**
     Naplnenie Offer packetu odpovedajucimi hodnotami.
@@ -148,7 +151,7 @@ void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t inte
     @param *dhcpOffer Odkaz na strukturu offer packetu
     @return dhcp_t
 */
-void sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest);
+int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest);
 
 /**
     Naplnenie Ack packetu odpovedajucimi hodnotami.
@@ -171,7 +174,7 @@ void makeAck(Dhcp *dhcpAck, Dhcp *dhcpRequest, uint8_t mac[], uint32_t interface
     @param *dhcpAck 
     @return int
 */
-void sendAck(int *socket, Dhcp *dhcpAck);
+int sendAck(int *socket, Dhcp *dhcpAck);
 
 /**
     Handler pri odchyteni ukoncujuceho signalu.
