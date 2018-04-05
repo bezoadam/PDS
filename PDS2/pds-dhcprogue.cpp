@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
 		memset(&dhcpOffer,0, sizeof(dhcpOffer));
 		memset(&dhcpRequest,0, sizeof(dhcpRequest));
 		memset(&dhcpAck,0, sizeof(dhcpAck));
+
 		if (offeredIp == htonl(inputStruct->endPool)) {
 			if ((close(socket)) == -1) {
 				print_error(SOCKET_ERR);
@@ -161,7 +162,9 @@ int sendAck(int *socket, Dhcp *dhcpAck) {
 	if (sendto(*socket, dhcpAck, sizeof(*dhcpAck),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
 		return SEND_ERR;
 
+#ifdef DEBUG
 	cout << "\nACK send\n";
+#endif
 	return NO_ERR;
 }
 
@@ -247,7 +250,9 @@ int waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 	socklen_t addrlen;
 	addrlen = sizeof(addrIn);
 
+#ifdef DEBUG
 	cout << "\n waiting for discover \n" << flush;
+#endif
 	/* Citanie dat zo socketu */
 
 	while (1) {
@@ -257,10 +262,10 @@ int waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
 			return RECV_ERR;
 		}
 
-		cout << "\nreceived\n";
-
 		if (dhcpDiscover->bp_options[2] == (uint8_t)DHCP_OPTION_DISCOVER) {
+#ifdef DEBUG
 			printf("DHCP DISCOVER received\n");
+#endif
 			return NO_ERR;
 		}
 	}
@@ -320,8 +325,6 @@ int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) 
 	if (sendto(*socket, dhcpOffer, sizeof(*dhcpOffer),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
 		return SEND_ERR;
 
-	cout << "\nwaiting for receive\n";
-
 	while(1) {
 		/* Citanie dat zo socketu */
 		if (recvfrom(*socket, dhcpRequest, sizeof(*dhcpRequest), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
@@ -330,11 +333,13 @@ int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) 
 			return RECV_ERR;
 		}
 
-		cout << "\nreceived request\n";
-
 		if (dhcpRequest->bp_options[2] == (uint8_t)DHCP_OPTION_REQUEST) {
+
+#ifdef DEBUG
 			printf("DHCP REQUEST received\n");
 	    	printf("%s\n", inet_ntoa(*(struct in_addr *)&dhcpRequest->yiaddr));
+#endif
+
 			return NO_ERR;
 		}	
 	}
@@ -360,8 +365,10 @@ uint32_t configureSocket(int *sock, string interface) {
 
  	ioctl(*sock, SIOCGIFADDR, &ifr);
 
+#ifdef DEBUG
  	/* display result */
 	printf("%s\n", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+#endif
 
 	memset(&addrIn,0,sizeof(addrIn));
 	addrIn.sin_family=AF_INET;
@@ -409,7 +416,6 @@ void fillDhcpOptions(uint8_t *packetOptionPart, uint8_t code, uint8_t *data, u_i
 }
 
 void sigCatch(int sig) {
-	cout << "\nSIGINT CATCH\n";
 	flag = 1;
 }
 

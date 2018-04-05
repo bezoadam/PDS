@@ -109,6 +109,7 @@ void getMacAddress(uint8_t mac[], uint32_t *xid);
 /**
     Naplnenie Discover packetu odpovedajucimi hodnotami.
 
+    @param *dhcpDiscover Odkaz na strukturu Discover packetu
     @param mac[] Odkaz na pole s mac adresou
     @param xid Odkaz na hodnotu transaction id
     @return void
@@ -119,8 +120,9 @@ void makeDiscover(Dhcp *dhcpDiscover, uint8_t mac[], uint32_t *xid);
     Odoslanie Discover packetu a ziskanie Offer packetu.
 
     @param *dhcpDiscover Odkaz na strukturu Discover packetu
+    @param *dhcpOffer Odkaz na strukturu Offer packetu
     @param socket Odkaz na socket
-    @return dhcp_t Struktura Offer packetu
+    @return int
 */
 int sendDiscoverAndReceiveOffer(Dhcp *dhcpDiscover, Dhcp *dhcpOffer, int *socket);
 
@@ -140,8 +142,9 @@ void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint3
     Odoslanie Request packetu a ziskanie ACK packetu.
 
     @param *dhcpRequest Odkaz na strukturu Request packetu
+    @param *dhcpAck Odkaz na strukturu Ack packetu
     @param *socket Odkaz na socket
-    @return void
+    @return int
 */
 int sendRequestAndReceiveAck(Dhcp *dhcpRequest, Dhcp *dhcpAck, int *socket);
 

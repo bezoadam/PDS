@@ -44,14 +44,16 @@ using namespace std;
 #define DHCP_FILE_LEN    128
 #define DHCP_OPTIONS_LEN 300
 
+// #define DEBUG           1
+
 enum {
     NO_ERR = 0,      //0
     ERR_BADPARAMS,   //1
     SOCKET_ERR,      //2
     SEND_ERR,        //3
     RECV_ERR,        //4
-    OTHER_ERR,        //5
-    SIG_INT        //6
+    OTHER_ERR,       //5
+    SIG_INT          //6
 };
 
 const char *errors[] = {
@@ -118,7 +120,7 @@ void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress);
 
     @param pDottedQuad ip adresa v char[]
     @param *pIpAddr Odkaz na ip adresu v uint32_t
-    @return int
+    @return void
 */
 void ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
 
@@ -126,7 +128,8 @@ void ipStringToNumber(const char *pDottedQuad, unsigned int *pIpAddr);
     Cakanie na disover packet.
 
     @param *socket odkaz na socket
-    @return dhcp_t struktura discover packetu
+    @param *dhcpDiscover Odkaz na strukturu Discover packetu
+    @return int
 */
 int waitForDiscover(int *socket, Dhcp *dhcpDiscover);
 
@@ -137,8 +140,8 @@ int waitForDiscover(int *socket, Dhcp *dhcpDiscover);
     @param *dhcpDiscover Odkaz na strukturu Discover packetu
     @param mac[] Mac adresa rozhrania
     @param interfaceBroadcastAddress Broadcast adresa rozhrania
-    @param offeredIp Odkaz na ponukanu ip adresu
-    @param serverIp Odkaz na gateway adresu 
+    @param offeredIp Ponukana ip adresa
+    @param serverIp Ponukana gateway adresa 
     @param *input Odkaz na vstupnu strukturu
     @return int
 */
@@ -148,21 +151,22 @@ void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t inte
     Odoslanie Offer packetu na rozhranie a ziskanie Request packetu
 
     @param *socket Odkaz na socket
-    @param *dhcpOffer Odkaz na strukturu offer packetu
-    @return dhcp_t
+    @param *dhcpOffer Odkaz na strukturu Offer packetu
+    @param *dhcpRequest Odkaz na strukturu Request packetu
+    @return int
 */
 int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest);
 
 /**
     Naplnenie Ack packetu odpovedajucimi hodnotami.
 
-    @param *dhcpAck 
-    @param *dhcpRequest
-    @param mac[]
-    @param interfaceBroadcastAddress
-    @param offeredIp
-    @param serverIp
-    @param *input
+    @param *dhcpAck Odkaz na strukturu Ack packetu
+    @param *dhcpRequest Odkaz na strukturu Request packetu
+    @param mac[] Mac adresa rozhrania
+    @param interfaceBroadcastAddress Broadcast adresa rozhrania
+    @param offeredIp Ponukana ip adresa
+    @param serverIp Ponukana gateway adresa
+    @param *input Odkaz na vstupnu strukturu
     @return int
 */
 void makeAck(Dhcp *dhcpAck, Dhcp *dhcpRequest, uint8_t mac[], uint32_t interfaceBroadcastAddress, uint32_t offeredIp, uint32_t serverIp, input_t *input);
@@ -170,8 +174,8 @@ void makeAck(Dhcp *dhcpAck, Dhcp *dhcpRequest, uint8_t mac[], uint32_t interface
 /**
     Odoslanie Ack packetu na rozhranie.
 
-    @param *socket
-    @param *dhcpAck 
+    @param *socket Odkaz na socket
+    @param *dhcpAck Odkaz na Ack packet
     @return int
 */
 int sendAck(int *socket, Dhcp *dhcpAck);
@@ -189,7 +193,7 @@ void sigCatch(int sig);
 
     @param *sock Odkaz na socket
     @param interface Interface zadany zo vstupnych argumentov
-    @return void
+    @return uint32_t
 */
 uint32_t configureSocket(int *sock, string interface);
 
