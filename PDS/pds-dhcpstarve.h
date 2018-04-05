@@ -43,6 +43,8 @@ using namespace std;
 #define DHCP_FILE_LEN    128
 #define DHCP_OPTIONS_LEN 300
 
+#define DEBUG            1
+
 /**
     Error handling.
 */
@@ -52,8 +54,8 @@ enum {
     SOCKET_ERR,      //2
     SEND_ERR,        //3
     RECV_ERR,        //4
-    OTHER_ERR,        //5
-    SIG_INT        //6
+    OTHER_ERR,       //5
+    SIG_INT          //6
 };
 
 const char *errors[] = {
