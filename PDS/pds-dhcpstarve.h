@@ -43,23 +43,34 @@ using namespace std;
 #define DHCP_FILE_LEN    128
 #define DHCP_OPTIONS_LEN 300
 
+#define DEBUG            1
+
 /**
     Error handling.
 */
 enum {
-    NO_ERR = 0,     //0
-    ERR_BADPARAMS,  //1
+    NO_ERR = 0,      //0
+    ERR_BADPARAMS,   //1
+    SOCKET_ERR,      //2
+    SEND_ERR,        //3
+    RECV_ERR,        //4
+    OTHER_ERR,       //5
+    SIG_INT          //6
 };
 
 const char *errors[] = {
     "Ziadna chyba.",
-    "Chyba vo vstupnych parametroch"
+    "Chyba vo vstupnych parametroch",
+    "Chyba so socketom.",
+    "Chyba pri odosielani packetu",
+    "Chyba pri prijmani packetu",
+    "Neznama chyba"
 };
 
 /**
     Struktura DHCP packetu.
 */
-typedef struct dhcp {
+struct Dhcp {
     uint8_t    opcode;
     uint8_t    htype;
     uint8_t    hlen;
@@ -76,7 +87,7 @@ typedef struct dhcp {
     uint8_t    bp_file[DHCP_FILE_LEN];
     uint32_t   magic_cookie;
     uint8_t    bp_options[DHCP_OPTIONS_LEN];
-} dhcp_t;
+};
 
 /**
     Handler pri odchyteni ukoncujuceho signalu.
@@ -98,20 +109,22 @@ void getMacAddress(uint8_t mac[], uint32_t *xid);
 /**
     Naplnenie Discover packetu odpovedajucimi hodnotami.
 
+    @param *dhcpDiscover Odkaz na strukturu Discover packetu
     @param mac[] Odkaz na pole s mac adresou
     @param xid Odkaz na hodnotu transaction id
     @return void
 */
-void makeDiscover(dhcp_t *dhcpDiscover, uint8_t mac[], uint32_t *xid);
+void makeDiscover(Dhcp *dhcpDiscover, uint8_t mac[], uint32_t *xid);
 
 /**
     Odoslanie Discover packetu a ziskanie Offer packetu.
 
     @param *dhcpDiscover Odkaz na strukturu Discover packetu
+    @param *dhcpOffer Odkaz na strukturu Offer packetu
     @param socket Odkaz na socket
-    @return dhcp_t Struktura Offer packetu
+    @return int
 */
-dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket);
+int sendDiscoverAndReceiveOffer(Dhcp *dhcpDiscover, Dhcp *dhcpOffer, int *socket);
 
 /**
    Naplnenie Request packetu odpovedajucimi hodnotami.
@@ -123,16 +136,17 @@ dhcp_t sendDiscoverAndReceiveOffer(dhcp_t *dhcpDiscover, int *socket);
    @param *offeredIp Odkaz na ponukanu ip adresu z Offer packetu
    @return void
 */
-void makeRequest(dhcp_t *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint32_t *xid, uint32_t *offeredIp);
+void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint32_t *xid, uint32_t *offeredIp);
 
 /**
     Odoslanie Request packetu a ziskanie ACK packetu.
 
     @param *dhcpRequest Odkaz na strukturu Request packetu
+    @param *dhcpAck Odkaz na strukturu Ack packetu
     @param *socket Odkaz na socket
-    @return void
+    @return int
 */
-void sendRequestAndReceiveAck(dhcp_t *dhcpRequest, int *socket);
+int sendRequestAndReceiveAck(Dhcp *dhcpRequest, Dhcp *dhcpAck, int *socket);
 
 /**
     Konfiguracia socketu na odoslielanie a prijmanie Broadcast packetov na dane rozhrannie.
