@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
 		memset(&dhcpRequest,0, sizeof(dhcpRequest));
 		memset(&dhcpAck,0, sizeof(dhcpAck));
 
+		printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)&offeredIp));
 		if (offeredIp == htonl(inputStruct->endPool)) {
 			if ((close(socket)) == -1) {
 				print_error(SOCKET_ERR);

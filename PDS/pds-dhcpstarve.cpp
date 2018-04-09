@@ -119,6 +119,8 @@ int main(int argc, char **argv) {
 			}
 			return sendRequestAndReceiveAckResult;	    	
 	    }
+
+	    printf("\n DHCP ACK received \n");
     }
 
     if ((close(socket)) == -1)      // close the socket
@@ -210,6 +212,8 @@ int sendDiscoverAndReceiveOffer(Dhcp *dhcpDiscover, Dhcp *dhcpOffer, int *socket
 	if (sendto(*socket, dhcpDiscover, sizeof(*dhcpDiscover),0, (struct sockaddr *) &addrOut, sizeof(addrOut)) < 0)
 		err(1,"sendto");
 
+	printf("\n DHCP Discover sent \n");
+
 	while(1) {
 		/* Citanie dat zo socketu */
 		if (recvfrom(*socket, dhcpOffer, sizeof(*dhcpOffer), 0, (struct sockaddr *) &addrIn, &addrlen) < 0) {
@@ -245,9 +249,9 @@ void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint3
 
     memcpy(dhcpRequest->chaddr, mac, DHCP_CHADDR_LEN);
     dhcpRequest->magic_cookie = htonl(0x63825363);
-#ifdef DEBUG
-   	printf("%s\n", inet_ntoa(*(struct in_addr *)offeredIp));
-#endif
+
+   	printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)offeredIp));
+
    	uint8_t option = DHCP_OPTION_REQUEST;
    	fillDhcpOptions(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
    	fillDhcpOptions(&dhcpRequest->bp_options[3], MESSAGE_TYPE_REQ_IP, (u_int8_t *)offeredIp, sizeof(uint32_t));
@@ -273,6 +277,8 @@ int sendRequestAndReceiveAck(Dhcp *dhcpRequest, Dhcp *dhcpAck, int *socket) {
 	addrOut.sin_family=AF_INET;
 	addrOut.sin_addr.s_addr=inet_addr("255.255.255.255");
 	addrOut.sin_port=htons(67);
+
+	printf("\n DHCP Request sent \n");
 
 	while(1) {
 		/* Odoslanie struktury na dany socket */
