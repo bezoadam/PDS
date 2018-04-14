@@ -60,6 +60,9 @@ int main(int argc, char **argv) {
 		return ERR_BADPARAMS;
 	}
 
+	//Inkrementujeme koncovu ip adresu aby vo while cykle sa kontrolovala posledna zadana adresa korektne
+	inputStruct->endPool = incrementIpAddress(htonl(inputStruct->endPool));
+
 	/* Odchytenie SIG INT signalu */
 	struct sigaction sigIntHandler;
 
@@ -89,8 +92,7 @@ int main(int argc, char **argv) {
 		memset(&dhcpRequest,0, sizeof(dhcpRequest));
 		memset(&dhcpAck,0, sizeof(dhcpAck));
 
-		printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)&offeredIp));
-		if (offeredIp == htonl(inputStruct->endPool)) {
+		if (offeredIp == inputStruct->endPool) {
 			if ((close(socket)) == -1) {
 				print_error(SOCKET_ERR);
 				return SOCKET_ERR;
@@ -98,6 +100,7 @@ int main(int argc, char **argv) {
 			cout << "Vycerpany adresny pool adries. \n";
 			return NO_ERR;
 		}
+		printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)&offeredIp));
 
 		int waitForDiscoverResult = waitForDiscover(&socket, &dhcpDiscover);
 
