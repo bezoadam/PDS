@@ -97,7 +97,13 @@ int main(int argc, char **argv) {
 	    }
 	  
 	    uint8_t dhcpServerId[4];
-	    memcpy(&dhcpServerId, &dhcpOffer.siaddr, 4);
+
+	    for (int i = 0; i < DHCP_OPTIONS_LEN; i++) {
+	    	if (dhcpOffer.bp_options[i] == uint8_t(4)) {
+		    	memcpy(&dhcpServerId, &dhcpOffer.bp_options[i + 1], sizeof(uint32_t));
+	    		break;
+	    	}
+	    }
 
 	    uint32_t offeredIp;
 	    memcpy(&offeredIp, &dhcpOffer.yiaddr, sizeof(uint32_t));
@@ -261,7 +267,7 @@ void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint3
    	memcpy(&dhcpRequest->bp_options[11], dhcpServerId, sizeof(uint32_t));
 	
 	option = 0;
-   	fillDhcpOptions(&dhcpRequest->bp_options[19], MESSAGE_TYPE_END, &option, 0);
+   	fillDhcpOptions(&dhcpRequest->bp_options[15], MESSAGE_TYPE_END, &option, 0);
 }
 
 int sendRequestAndReceiveAck(Dhcp *dhcpRequest, Dhcp *dhcpAck, int *socket) {
