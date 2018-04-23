@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
 		return ERR_BADPARAMS;
 	}
 
-	//Inkrementujeme koncovu ip adresu aby vo while cykle sa kontrolovala posledna zadana adresa korektne
 	inputStruct->endPool = incrementIpAddress(htonl(inputStruct->endPool));
 
 	/* Odchytenie SIG INT signalu */
@@ -153,9 +152,7 @@ int main(int argc, char **argv) {
 }
 
 int sendAck(int *socket, Dhcp *dhcpAck) {
-	int n;
-	struct sockaddr_in   addrIn, addrOut;
-	socklen_t addrlen;
+	struct sockaddr_in addrOut;
 
 	memset(&addrOut,0,sizeof(addrOut));
 	addrOut.sin_family=AF_INET;
@@ -243,14 +240,12 @@ void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress) {
   }
 
   if (ioctl(fd, SIOCGIFNETMASK, &s) == 0) {
-  	uint32_t bc;
   	memcpy(broadcastAddress, &((struct sockaddr_in *)&s.ifr_netmask)->sin_addr, sizeof(uint32_t));
   }
 }
 
 int waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
-	int n;
-	struct sockaddr_in   addrIn, addrOut;
+	struct sockaddr_in   addrIn;
 	socklen_t addrlen;
 	addrlen = sizeof(addrIn);
 
@@ -315,7 +310,6 @@ void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t inte
 }
 
 int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) {
-	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
 	addrlen = sizeof(addrIn);
