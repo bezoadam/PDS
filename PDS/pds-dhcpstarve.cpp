@@ -97,7 +97,13 @@ int main(int argc, char **argv) {
 	    }
 	  
 	    uint8_t dhcpServerId[4];
-	    memcpy(&dhcpServerId, &dhcpOffer.bp_options[5], 4);
+
+	    for (int i = 0; i < DHCP_OPTIONS_LEN; i++) {
+	    	if (dhcpOffer.bp_options[i] == uint8_t(54)) {
+		    	memcpy(&dhcpServerId, &dhcpOffer.bp_options[i + 2], sizeof(uint32_t));
+	    		break;
+	    	}
+	    }
 
 	    uint32_t offeredIp;
 	    memcpy(&offeredIp, &dhcpOffer.yiaddr, sizeof(uint32_t));
@@ -244,13 +250,13 @@ void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint3
     dhcpRequest->flags = htons(0x8000);
     dhcpRequest->ciaddr = 0;
     dhcpRequest->yiaddr = *offeredIp;
-    dhcpRequest->siaddr = 0;
+    memcpy(&dhcpRequest->siaddr, dhcpServerId, sizeof(uint32_t));
     dhcpRequest->giaddr = 0;
 
     memcpy(dhcpRequest->chaddr, mac, DHCP_CHADDR_LEN);
     dhcpRequest->magic_cookie = htonl(0x63825363);
 
-   	printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)offeredIp));
+   	printf(" Offered ip: %s\n", inet_ntoa(*(struct in_addr *)offeredIp));
 
    	uint8_t option = DHCP_OPTION_REQUEST;
    	fillDhcpOptions(&dhcpRequest->bp_options[0], MESSAGE_TYPE_DHCP, &option, sizeof(option));
@@ -261,7 +267,7 @@ void makeRequest(Dhcp *dhcpRequest, uint8_t mac[], uint8_t dhcpServerId[], uint3
    	memcpy(&dhcpRequest->bp_options[11], dhcpServerId, sizeof(uint32_t));
 	
 	option = 0;
-   	fillDhcpOptions(&dhcpRequest->bp_options[19], MESSAGE_TYPE_END, &option, 0);
+   	fillDhcpOptions(&dhcpRequest->bp_options[15], MESSAGE_TYPE_END, &option, 0);
 }
 
 int sendRequestAndReceiveAck(Dhcp *dhcpRequest, Dhcp *dhcpAck, int *socket) {

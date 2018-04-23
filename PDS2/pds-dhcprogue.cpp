@@ -60,6 +60,8 @@ int main(int argc, char **argv) {
 		return ERR_BADPARAMS;
 	}
 
+	inputStruct->endPool = incrementIpAddress(htonl(inputStruct->endPool));
+
 	/* Odchytenie SIG INT signalu */
 	struct sigaction sigIntHandler;
 
@@ -89,8 +91,7 @@ int main(int argc, char **argv) {
 		memset(&dhcpRequest,0, sizeof(dhcpRequest));
 		memset(&dhcpAck,0, sizeof(dhcpAck));
 
-		printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)&offeredIp));
-		if (offeredIp == htonl(inputStruct->endPool)) {
+		if (offeredIp == inputStruct->endPool) {
 			if ((close(socket)) == -1) {
 				print_error(SOCKET_ERR);
 				return SOCKET_ERR;
@@ -98,6 +99,7 @@ int main(int argc, char **argv) {
 			cout << "Vycerpany adresny pool adries. \n";
 			return NO_ERR;
 		}
+		printf("Offered ip: %s\n", inet_ntoa(*(struct in_addr *)&offeredIp));
 
 		int waitForDiscoverResult = waitForDiscover(&socket, &dhcpDiscover);
 
@@ -150,9 +152,7 @@ int main(int argc, char **argv) {
 }
 
 int sendAck(int *socket, Dhcp *dhcpAck) {
-	int n;
-	struct sockaddr_in   addrIn, addrOut;
-	socklen_t addrlen;
+	struct sockaddr_in addrOut;
 
 	memset(&addrOut,0,sizeof(addrOut));
 	addrOut.sin_family=AF_INET;
@@ -240,14 +240,12 @@ void getMacAddress(string interface, uint8_t *mac, uint32_t *broadcastAddress) {
   }
 
   if (ioctl(fd, SIOCGIFNETMASK, &s) == 0) {
-  	uint32_t bc;
   	memcpy(broadcastAddress, &((struct sockaddr_in *)&s.ifr_netmask)->sin_addr, sizeof(uint32_t));
   }
 }
 
 int waitForDiscover(int *socket, Dhcp *dhcpDiscover) {
-	int n;
-	struct sockaddr_in   addrIn, addrOut;
+	struct sockaddr_in   addrIn;
 	socklen_t addrlen;
 	addrlen = sizeof(addrIn);
 
@@ -312,7 +310,6 @@ void makeOffer(Dhcp *dhcpOffer, Dhcp *dhcpDiscover, uint8_t mac[], uint32_t inte
 }
 
 int sendOfferAndReceiveRequest(int *socket, Dhcp *dhcpOffer, Dhcp *dhcpRequest) {
-	int n;
 	struct sockaddr_in   addrIn, addrOut;
 	socklen_t addrlen;
 	addrlen = sizeof(addrIn);
