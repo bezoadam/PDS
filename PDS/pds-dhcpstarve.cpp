@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
 	    uint8_t dhcpServerId[4];
 
 	    for (int i = 0; i < DHCP_OPTIONS_LEN; i++) {
-	    	if (dhcpOffer.bp_options[i] == uint8_t(4)) {
-		    	memcpy(&dhcpServerId, &dhcpOffer.bp_options[i + 1], sizeof(uint32_t));
+	    	if (dhcpOffer.bp_options[i] == uint8_t(54)) {
+		    	memcpy(&dhcpServerId, &dhcpOffer.bp_options[i + 2], sizeof(uint32_t));
 	    		break;
 	    	}
 	    }
